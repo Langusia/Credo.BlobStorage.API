@@ -6,9 +6,17 @@ namespace Credo.BlobStorage.Core.Validation;
 /// <summary>
 /// S3-style object key (filename) validation.
 /// </summary>
-public static partial class FilenameValidator
+public static class FilenameValidator
 {
     private const int MaxLengthBytes = 1024;
+
+    private static readonly Regex ControlCharsRegex = new(
+        @"[\x00-\x1F\x7F]",
+        RegexOptions.Compiled);
+
+    private static readonly Regex AllowedCharsRegex = new(
+        @"^[a-zA-Z0-9._\-/]+$",
+        RegexOptions.Compiled);
 
     /// <summary>
     /// Validates a filename according to S3 object key naming rules.
@@ -30,7 +38,7 @@ public static partial class FilenameValidator
         }
 
         // Check for control characters (0x00-0x1F and 0x7F)
-        if (ControlCharsRegex().IsMatch(filename))
+        if (ControlCharsRegex.IsMatch(filename))
         {
             return ValidationResult.Fail("Filename must not contain control characters.");
         }
@@ -48,7 +56,7 @@ public static partial class FilenameValidator
         }
 
         // Check allowed characters: a-z A-Z 0-9 . _ - /
-        if (!AllowedCharsRegex().IsMatch(filename))
+        if (!AllowedCharsRegex.IsMatch(filename))
         {
             return ValidationResult.Fail("Filename must contain only alphanumeric characters, dots (.), underscores (_), hyphens (-), and forward slashes (/).");
         }
@@ -77,10 +85,4 @@ public static partial class FilenameValidator
     {
         return Uri.UnescapeDataString(filename);
     }
-
-    [GeneratedRegex(@"[\x00-\x1F\x7F]")]
-    private static partial Regex ControlCharsRegex();
-
-    [GeneratedRegex(@"^[a-zA-Z0-9._\-/]+$")]
-    private static partial Regex AllowedCharsRegex();
 }

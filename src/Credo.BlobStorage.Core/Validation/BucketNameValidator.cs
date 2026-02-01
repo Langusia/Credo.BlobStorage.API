@@ -6,10 +6,18 @@ namespace Credo.BlobStorage.Core.Validation;
 /// <summary>
 /// S3-style bucket name validation.
 /// </summary>
-public static partial class BucketNameValidator
+public static class BucketNameValidator
 {
     private const int MinLength = 3;
     private const int MaxLength = 63;
+
+    private static readonly Regex AllowedCharsRegex = new(
+        "^[a-z0-9.-]+$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex Ipv4LikeRegex = new(
+        @"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",
+        RegexOptions.Compiled);
 
     /// <summary>
     /// Validates a bucket name according to S3 naming rules.
@@ -34,7 +42,7 @@ public static partial class BucketNameValidator
         }
 
         // Must contain only lowercase letters, digits, dots, and hyphens
-        if (!AllowedCharsRegex().IsMatch(name))
+        if (!AllowedCharsRegex.IsMatch(name))
         {
             return ValidationResult.Fail("Bucket name must contain only lowercase letters, digits, dots (.), and hyphens (-).");
         }
@@ -64,7 +72,7 @@ public static partial class BucketNameValidator
         }
 
         // Additional IPv4-like check (e.g., 192.168.1.1 pattern)
-        if (Ipv4LikeRegex().IsMatch(name))
+        if (Ipv4LikeRegex.IsMatch(name))
         {
             return ValidationResult.Fail("Bucket name must not be formatted as an IP address.");
         }
@@ -89,10 +97,4 @@ public static partial class BucketNameValidator
 
         return ValidationResult.Success();
     }
-
-    [GeneratedRegex("^[a-z0-9.-]+$")]
-    private static partial Regex AllowedCharsRegex();
-
-    [GeneratedRegex(@"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")]
-    private static partial Regex Ipv4LikeRegex();
 }
