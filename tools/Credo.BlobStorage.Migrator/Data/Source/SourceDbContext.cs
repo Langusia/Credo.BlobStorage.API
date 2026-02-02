@@ -63,10 +63,10 @@ public class SourceDbContext : DbContext
         modelBuilder.Entity<SourceDocumentContent>(entity =>
         {
             entity.ToTable(_options.ContentTable);
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.DocumentId);
 
-            entity.Property(e => e.Id)
-                .HasColumnName("Id");
+            entity.Property(e => e.DocumentId)
+                .HasColumnName("DocumentId");
 
             entity.Property(e => e.Documents)
                 .HasColumnType("varbinary(max)");

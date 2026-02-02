@@ -6,9 +6,9 @@ namespace Credo.BlobStorage.Migrator.Data.Source;
 public class SourceDocumentContent
 {
     /// <summary>
-    /// Primary key - matches DocumentID.
+    /// Foreign key to Documents table.
     /// </summary>
-    public long Id { get; set; }
+    public long DocumentId { get; set; }
 
     /// <summary>
     /// Actual blob content.
