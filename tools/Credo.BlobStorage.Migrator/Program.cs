@@ -46,7 +46,10 @@ try
     // Register Migration DbContext (SQL Server - migration log under 'migration' schema)
     builder.Services.AddDbContext<MigrationDbContext>(options =>
     {
-        options.UseSqlServer(migrationOptions.MigrationDbConnectionString);
+        options.UseSqlServer(migrationOptions.MigrationDbConnectionString, sqlOptions =>
+        {
+            sqlOptions.MigrationsAssembly(typeof(MigrationDbContext).Assembly.FullName);
+        });
     });
 
     // Register HttpClient for BlobStorage API
