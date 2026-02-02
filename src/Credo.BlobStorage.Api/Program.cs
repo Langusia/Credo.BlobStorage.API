@@ -81,15 +81,13 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+// Configure Swagger (enabled in all environments)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Credo.BlobStorage API v1");
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Credo.BlobStorage API v1");
+    c.RoutePrefix = "swagger";
+});
 
 // Add request logging middleware
 app.UseRequestLogging();
