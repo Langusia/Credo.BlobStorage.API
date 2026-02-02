@@ -37,16 +37,16 @@ try
         .Get<MigrationOptions>()
         ?? throw new InvalidOperationException("Migration configuration is missing");
 
-    // Register Source DbContext (SQL Server)
+    // Register Source DbContext (SQL Server - legacy documents)
     builder.Services.AddDbContext<SourceDbContext>(options =>
     {
         options.UseSqlServer(migrationOptions.SourceConnectionString);
     });
 
-    // Register Migration DbContext (PostgreSQL)
+    // Register Migration DbContext (SQL Server - migration log under 'migration' schema)
     builder.Services.AddDbContext<MigrationDbContext>(options =>
     {
-        options.UseNpgsql(migrationOptions.MigrationDbConnectionString);
+        options.UseSqlServer(migrationOptions.MigrationDbConnectionString);
     });
 
     // Register HttpClient for BlobStorage API

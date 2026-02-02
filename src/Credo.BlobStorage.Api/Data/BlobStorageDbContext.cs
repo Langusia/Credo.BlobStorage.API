@@ -8,6 +8,8 @@ namespace Credo.BlobStorage.Api.Data;
 /// </summary>
 public class BlobStorageDbContext : DbContext
 {
+    public const string SchemaName = "blobStorage";
+
     public BlobStorageDbContext(DbContextOptions<BlobStorageDbContext> options)
         : base(options)
     {
@@ -19,6 +21,9 @@ public class BlobStorageDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Set default schema
+        modelBuilder.HasDefaultSchema(SchemaName);
 
         ConfigureBucketEntity(modelBuilder);
         ConfigureObjectEntity(modelBuilder);
@@ -37,7 +42,7 @@ public class BlobStorageDbContext : DbContext
                 .IsRequired();
 
             entity.Property(e => e.CreatedAtUtc)
-                .HasDefaultValueSql("NOW()")
+                .HasDefaultValueSql("GETUTCDATE()")
                 .IsRequired();
         });
     }
@@ -51,7 +56,7 @@ public class BlobStorageDbContext : DbContext
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.Id)
-                .UseIdentityAlwaysColumn();
+                .UseIdentityColumn();
 
             entity.Property(e => e.Bucket)
                 .HasMaxLength(63)
@@ -72,7 +77,7 @@ public class BlobStorageDbContext : DbContext
                 .IsRequired();
 
             entity.Property(e => e.Sha256)
-                .HasColumnType("bytea")
+                .HasColumnType("varbinary(32)")
                 .HasMaxLength(32)
                 .IsRequired();
 
@@ -101,7 +106,7 @@ public class BlobStorageDbContext : DbContext
                 .IsRequired();
 
             entity.Property(e => e.CreatedAtUtc)
-                .HasDefaultValueSql("NOW()")
+                .HasDefaultValueSql("GETUTCDATE()")
                 .IsRequired();
 
             // Unique constraint on DocId

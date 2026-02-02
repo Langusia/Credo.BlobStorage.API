@@ -18,9 +18,9 @@ builder.Logging.AddDebug();
 builder.Services.Configure<StorageOptions>(
     builder.Configuration.GetSection(StorageOptions.SectionName));
 
-// Configure database
+// Configure database (SQL Server)
 builder.Services.AddDbContext<BlobStorageDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Register core services
 builder.Services.AddSingleton<IChecksumCalculator, Sha256ChecksumCalculator>();
@@ -62,6 +62,25 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 
 var app = builder.Build();
 
+// Apply migrations on startup - creates schema and tables automatically
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<BlobStorageDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        logger.LogInformation("Applying database migrations for schema '{Schema}'...", BlobStorageDbContext.SchemaName);
+        dbContext.Database.Migrate();
+        logger.LogInformation("Database migrations applied successfully");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred while applying database migrations");
+        throw;
+    }
+}
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -80,14 +99,6 @@ app.UseRouting();
 
 // Map controllers
 app.MapControllers();
-
-// Apply pending migrations on startup (in development)
-if (app.Environment.IsDevelopment())
-{
-    using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<BlobStorageDbContext>();
-    dbContext.Database.Migrate();
-}
 
 app.Run();
 

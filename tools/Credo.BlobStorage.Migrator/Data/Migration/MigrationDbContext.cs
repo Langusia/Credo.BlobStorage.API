@@ -3,10 +3,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Credo.BlobStorage.Migrator.Data.Migration;
 
 /// <summary>
-/// Entity Framework context for the migration log (PostgreSQL).
+/// Entity Framework context for the migration log (SQL Server).
 /// </summary>
 public class MigrationDbContext : DbContext
 {
+    public const string SchemaName = "migration";
+
     public MigrationDbContext(DbContextOptions<MigrationDbContext> options)
         : base(options)
     {
@@ -18,6 +20,9 @@ public class MigrationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Set default schema
+        modelBuilder.HasDefaultSchema(SchemaName);
+
         modelBuilder.Entity<MigrationLogEntry>(entity =>
         {
             entity.ToTable("MigrationLog");
@@ -25,7 +30,7 @@ public class MigrationDbContext : DbContext
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.Id)
-                .UseIdentityAlwaysColumn();
+                .UseIdentityColumn();
 
             entity.Property(e => e.SourceDocumentId)
                 .IsRequired();
@@ -75,7 +80,7 @@ public class MigrationDbContext : DbContext
                 .HasDefaultValue(0);
 
             entity.Property(e => e.CreatedAtUtc)
-                .HasDefaultValueSql("NOW()")
+                .HasDefaultValueSql("GETUTCDATE()")
                 .IsRequired();
 
             entity.Property(e => e.ProcessedAtUtc);

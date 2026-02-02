@@ -3,8 +3,8 @@ using System;
 using Credo.BlobStorage.Migrator.Data.Migration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -17,85 +17,86 @@ partial class MigrationDbContextModelSnapshot : ModelSnapshot
     {
 #pragma warning disable 612, 618
         modelBuilder
+            .HasDefaultSchema("migration")
             .HasAnnotation("ProductVersion", "9.0.0")
-            .HasAnnotation("Relational:MaxIdentifierLength", 63);
+            .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
-        NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+        SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
         modelBuilder.Entity("Credo.BlobStorage.Migrator.Data.Migration.MigrationLogEntry", b =>
             {
                 b.Property<int>("Id")
                     .ValueGeneratedOnAdd()
-                    .HasColumnType("integer");
+                    .HasColumnType("int");
 
-                NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                 b.Property<string>("ClaimedContentType")
                     .HasMaxLength(50)
-                    .HasColumnType("character varying(50)");
+                    .HasColumnType("nvarchar(50)");
 
                 b.Property<DateTime>("CreatedAtUtc")
                     .ValueGeneratedOnAdd()
-                    .HasColumnType("timestamp with time zone")
-                    .HasDefaultValueSql("NOW()");
+                    .HasColumnType("datetime2")
+                    .HasDefaultValueSql("GETUTCDATE()");
 
                 b.Property<string>("DetectedContentType")
                     .HasMaxLength(255)
-                    .HasColumnType("character varying(255)");
+                    .HasColumnType("nvarchar(255)");
 
                 b.Property<string>("ErrorMessage")
                     .HasMaxLength(2000)
-                    .HasColumnType("character varying(2000)");
+                    .HasColumnType("nvarchar(2000)");
 
                 b.Property<string>("OriginalExtension")
                     .HasMaxLength(10)
-                    .HasColumnType("character varying(10)");
+                    .HasColumnType("nvarchar(10)");
 
                 b.Property<string>("OriginalFilename")
                     .IsRequired()
                     .HasMaxLength(256)
-                    .HasColumnType("character varying(256)");
+                    .HasColumnType("nvarchar(256)");
 
                 b.Property<DateTime?>("ProcessedAtUtc")
-                    .HasColumnType("timestamp with time zone");
+                    .HasColumnType("datetime2");
 
                 b.Property<int>("RetryCount")
                     .ValueGeneratedOnAdd()
-                    .HasColumnType("integer")
+                    .HasColumnType("int")
                     .HasDefaultValue(0);
 
                 b.Property<long>("SourceDocumentId")
                     .HasColumnType("bigint");
 
                 b.Property<int>("SourceFileSize")
-                    .HasColumnType("integer");
+                    .HasColumnType("int");
 
                 b.Property<DateTime>("SourceRecordDate")
-                    .HasColumnType("timestamp with time zone");
+                    .HasColumnType("datetime2");
 
                 b.Property<int>("SourceYear")
-                    .HasColumnType("integer");
+                    .HasColumnType("int");
 
                 b.Property<int>("Status")
                     .ValueGeneratedOnAdd()
-                    .HasColumnType("integer")
+                    .HasColumnType("int")
                     .HasDefaultValue(0);
 
                 b.Property<string>("TargetBucket")
                     .HasMaxLength(63)
-                    .HasColumnType("character varying(63)");
+                    .HasColumnType("nvarchar(63)");
 
                 b.Property<string>("TargetDocId")
                     .HasMaxLength(50)
-                    .HasColumnType("character varying(50)");
+                    .HasColumnType("nvarchar(50)");
 
                 b.Property<string>("TargetFilename")
                     .HasMaxLength(1024)
-                    .HasColumnType("character varying(1024)");
+                    .HasColumnType("nvarchar(1024)");
 
                 b.Property<string>("TargetSha256")
                     .HasMaxLength(64)
-                    .HasColumnType("character varying(64)");
+                    .HasColumnType("nvarchar(64)");
 
                 b.HasKey("Id");
 
@@ -106,7 +107,7 @@ partial class MigrationDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("UQ_MigrationLog_SourceYear_SourceDocumentId");
 
-                b.ToTable("MigrationLog", (string)null);
+                b.ToTable("MigrationLog", "migration");
             });
 #pragma warning restore 612, 618
     }
