@@ -48,7 +48,8 @@ try
     {
         options.UseSqlServer(migrationOptions.MigrationDbConnectionString, sqlOptions =>
         {
-            sqlOptions.MigrationsAssembly(typeof(MigrationDbContext).Assembly.FullName);
+            // Use simple assembly name (not FullName which includes version info)
+            sqlOptions.MigrationsAssembly(typeof(MigrationDbContext).Assembly.GetName().Name);
         });
     });
 

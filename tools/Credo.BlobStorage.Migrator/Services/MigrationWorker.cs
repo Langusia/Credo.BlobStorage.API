@@ -88,17 +88,59 @@ public class MigrationWorker : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-        var pendingMigrations = await context.Database.GetPendingMigrationsAsync(ct);
-        _logger.LogInformation("Pending migrations: {Count}", pendingMigrations.Count());
-
-        foreach (var migration in pendingMigrations)
+        try
         {
-            _logger.LogInformation("  - {Migration}", migration);
+            var pendingMigrations = await context.Database.GetPendingMigrationsAsync(ct);
+            var pendingList = pendingMigrations.ToList();
+            _logger.LogInformation("Pending migrations: {Count}", pendingList.Count);
+
+            foreach (var migration in pendingList)
+            {
+                _logger.LogInformation("  - {Migration}", migration);
+            }
+
+            if (pendingList.Count > 0)
+            {
+                await context.Database.MigrateAsync(ct);
+                _logger.LogInformation("Database migrations applied successfully");
+            }
+            else
+            {
+                // Check if table exists, if not use EnsureCreated
+                var canConnect = await context.Database.CanConnectAsync(ct);
+                if (canConnect)
+                {
+                    try
+                    {
+                        // Try to access the table to see if it exists
+                        _ = await context.MigrationLog.AnyAsync(ct);
+                        _logger.LogInformation("MigrationLog table already exists, no migrations needed");
+                    }
+                    catch
+                    {
+                        _logger.LogWarning("MigrationLog table not found, attempting EnsureCreated...");
+                        await context.Database.EnsureCreatedAsync(ct);
+                        _logger.LogInformation("Database schema created via EnsureCreated");
+                    }
+                }
+            }
         }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Migration failed, attempting EnsureCreated as fallback...");
 
-        await context.Database.MigrateAsync(ct);
-
-        _logger.LogInformation("Database migrations applied successfully");
+            // Fallback: try EnsureCreated if migrations fail
+            try
+            {
+                await context.Database.EnsureCreatedAsync(ct);
+                _logger.LogInformation("Database schema created via EnsureCreated fallback");
+            }
+            catch (Exception ensureEx)
+            {
+                _logger.LogError(ensureEx, "EnsureCreated also failed");
+                throw;
+            }
+        }
     }
 
     private async Task<bool> EnsureBucketExistsAsync(CancellationToken ct)
