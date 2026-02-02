@@ -83,10 +83,18 @@ public class MigrationWorker : BackgroundService
 
     private async Task ApplyMigrationsAsync(CancellationToken ct)
     {
-        _logger.LogInformation("Applying database migrations...");
+        _logger.LogInformation("Applying database migrations for schema '{Schema}'...", MigrationDbContext.SchemaName);
 
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
+
+        var pendingMigrations = await context.Database.GetPendingMigrationsAsync(ct);
+        _logger.LogInformation("Pending migrations: {Count}", pendingMigrations.Count());
+
+        foreach (var migration in pendingMigrations)
+        {
+            _logger.LogInformation("  - {Migration}", migration);
+        }
 
         await context.Database.MigrateAsync(ct);
 
