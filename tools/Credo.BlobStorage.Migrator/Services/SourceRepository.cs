@@ -37,7 +37,7 @@ public class SourceRepository : ISourceRepository
     {
         var content = await _context.DocumentContents
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == documentId, ct);
+            .FirstOrDefaultAsync(c => c.DocumentId == documentId, ct);
 
         return content?.Documents;
     }
