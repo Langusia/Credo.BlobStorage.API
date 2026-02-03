@@ -185,50 +185,52 @@ public class MigrationWorker : BackgroundService
         }
 
         var documentsTable = _options.DocumentsTable;
-        _logger.LogInformation("Enriching metadata from [dbo].[{Table}]...", documentsTable);
 
-        // Use raw SQL UPDATE with JOIN - runs entirely on the database server
-        // MigrationLog and Documents are in the same database, just different schemas
+        // Build and execute enrichment SQL
         var enrichSql = $@"
-            UPDATE ml
-            SET
-                ml.OriginalFilename = d.DocumentName,
-                ml.OriginalExtension = CASE
-                    WHEN d.DocumentExt IS NULL THEN NULL
-                    WHEN LEFT(d.DocumentExt, 1) = '.' THEN SUBSTRING(d.DocumentExt, 2, LEN(d.DocumentExt))
-                    ELSE d.DocumentExt
-                END,
-                ml.ClaimedContentType = d.ContentType,
-                ml.SourceFileSize = d.FileSize,
-                ml.SourceRecordDate = d.RecordDate,
-                ml.Status = {(int)MigrationStatus.Pending}
-            FROM [migration].[MigrationLog] ml
-            INNER JOIN [dbo].[{documentsTable}] d
-                ON ml.SourceDocumentId = d.ContentId
-            WHERE ml.SourceYear = @Year
-                AND ml.Status = {(int)MigrationStatus.Seeded}
-                AND d.DelStatus = 0";
+UPDATE ml
+SET
+    ml.OriginalFilename = d.DocumentName,
+    ml.OriginalExtension = CASE
+        WHEN d.DocumentExt IS NULL THEN NULL
+        WHEN LEFT(d.DocumentExt, 1) = '.' THEN SUBSTRING(d.DocumentExt, 2, LEN(d.DocumentExt))
+        ELSE d.DocumentExt
+    END,
+    ml.ClaimedContentType = d.ContentType,
+    ml.SourceFileSize = d.FileSize,
+    ml.SourceRecordDate = d.RecordDate,
+    ml.Status = {(int)MigrationStatus.Pending}
+FROM [migration].[MigrationLog] ml
+INNER JOIN [dbo].[{documentsTable}] d
+    ON ml.SourceDocumentId = d.ContentId
+WHERE ml.SourceYear = @Year
+    AND ml.Status = {(int)MigrationStatus.Seeded}
+    AND d.DelStatus = 0";
+
+        _logger.LogInformation("Executing enrichment SQL:\n{Sql}", enrichSql);
 
         var enrichedCount = await migrationContext.Database.ExecuteSqlRawAsync(
             enrichSql,
-            new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year),
+            new object[] { new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year) },
             ct);
 
         _logger.LogInformation("Enriched {Count} entries with metadata", enrichedCount);
 
         // Mark remaining seeded entries (no matching metadata) as skipped
         var skipSql = $@"
-            UPDATE [migration].[MigrationLog]
-            SET
-                Status = {(int)MigrationStatus.Skipped},
-                ErrorMessage = 'No metadata found in source database (no Documents.ContentId match)',
-                ProcessedAtUtc = GETUTCDATE()
-            WHERE SourceYear = @Year
-                AND Status = {(int)MigrationStatus.Seeded}";
+UPDATE [migration].[MigrationLog]
+SET
+    Status = {(int)MigrationStatus.Skipped},
+    ErrorMessage = 'No metadata found in source database (no Documents.ContentId match)',
+    ProcessedAtUtc = GETUTCDATE()
+WHERE SourceYear = @Year
+    AND Status = {(int)MigrationStatus.Seeded}";
+
+        _logger.LogInformation("Executing skip SQL:\n{Sql}", skipSql);
 
         var skippedCount = await migrationContext.Database.ExecuteSqlRawAsync(
             skipSql,
-            new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year),
+            new object[] { new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year) },
             ct);
 
         if (skippedCount > 0)
