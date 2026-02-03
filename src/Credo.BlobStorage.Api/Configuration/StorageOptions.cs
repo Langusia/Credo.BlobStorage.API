@@ -47,4 +47,9 @@ public class StorageOptions
         "image/gif",
         "text/plain"
     ];
+
+    /// <summary>
+    /// Buckets to seed on application startup.
+    /// </summary>
+    public string[] DefaultBuckets { get; set; } = ["default"];
 }

@@ -1,10 +1,12 @@
 using Credo.BlobStorage.Api.Configuration;
 using Credo.BlobStorage.Api.Data;
+using Credo.BlobStorage.Api.Data.Entities;
 using Credo.BlobStorage.Api.Middleware;
 using Credo.BlobStorage.Api.Services;
 using Credo.BlobStorage.Core.Checksums;
 using Credo.BlobStorage.Core.Mime;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -62,21 +64,50 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 
 var app = builder.Build();
 
-// Apply migrations on startup - creates schema and tables automatically
+// Apply migrations and seed default buckets on startup
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<BlobStorageDbContext>();
+    var storageOptions = scope.ServiceProvider.GetRequiredService<IOptions<StorageOptions>>().Value;
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
     try
     {
+        // Apply migrations
         logger.LogInformation("Applying database migrations for schema '{Schema}'...", BlobStorageDbContext.SchemaName);
         dbContext.Database.Migrate();
         logger.LogInformation("Database migrations applied successfully");
+
+        // Seed default buckets
+        if (storageOptions.DefaultBuckets.Length > 0)
+        {
+            logger.LogInformation("Seeding {Count} default bucket(s)...", storageOptions.DefaultBuckets.Length);
+
+            foreach (var bucketName in storageOptions.DefaultBuckets)
+            {
+                var exists = await dbContext.Buckets.AnyAsync(b => b.Name == bucketName);
+                if (!exists)
+                {
+                    dbContext.Buckets.Add(new BucketEntity
+                    {
+                        Name = bucketName,
+                        CreatedAtUtc = DateTime.UtcNow
+                    });
+                    logger.LogInformation("Created default bucket: {BucketName}", bucketName);
+                }
+                else
+                {
+                    logger.LogDebug("Default bucket '{BucketName}' already exists", bucketName);
+                }
+            }
+
+            await dbContext.SaveChangesAsync();
+            logger.LogInformation("Default buckets seeded successfully");
+        }
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "An error occurred while applying database migrations");
+        logger.LogError(ex, "An error occurred during database initialization");
         throw;
     }
 }
