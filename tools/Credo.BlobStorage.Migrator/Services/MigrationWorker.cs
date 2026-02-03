@@ -44,7 +44,7 @@ public class MigrationWorker : BackgroundService
             _logger.LogInformation("Batch size: {BatchSize}, Max parallelism: {MaxParallelism}",
                 _options.BatchSize, _options.MaxParallelism);
 
-            // Step 1: Apply migrations
+            // Step 1: Ensure migration log table exists
             await ApplyMigrationsAsync(stoppingToken);
 
             // Step 2: Ensure target bucket exists
@@ -54,13 +54,16 @@ public class MigrationWorker : BackgroundService
                 return;
             }
 
-            // Step 3: Seed phase
-            await SeedPendingDocumentsAsync(stoppingToken);
+            // Step 3: Seed document IDs from content database
+            await SeedDocumentIdsAsync(stoppingToken);
 
-            // Step 4: Migrate phase
+            // Step 4: Enrich with metadata from source database
+            await EnrichMetadataAsync(stoppingToken);
+
+            // Step 5: Migrate documents to API
             await MigrateDocumentsAsync(stoppingToken);
 
-            // Step 5: Report statistics
+            // Step 6: Report statistics
             await ReportStatisticsAsync(stoppingToken);
 
             stopwatch.Stop();
@@ -109,11 +112,11 @@ public class MigrationWorker : BackgroundService
                     [Id] int NOT NULL IDENTITY(1,1),
                     [SourceDocumentId] bigint NOT NULL,
                     [SourceYear] int NOT NULL,
-                    [OriginalFilename] nvarchar(256) NOT NULL,
+                    [OriginalFilename] nvarchar(256) NULL,
                     [OriginalExtension] nvarchar(10) NULL,
                     [ClaimedContentType] nvarchar(50) NULL,
-                    [SourceFileSize] int NOT NULL,
-                    [SourceRecordDate] datetime2 NOT NULL,
+                    [SourceFileSize] int NULL,
+                    [SourceRecordDate] datetime2 NULL,
                     [Status] int NOT NULL DEFAULT 0,
                     [TargetDocId] nvarchar(50) NULL,
                     [TargetBucket] nvarchar(63) NULL,
@@ -148,20 +151,22 @@ public class MigrationWorker : BackgroundService
         return await apiClient.EnsureBucketExistsAsync(_options.TargetBucket, ct);
     }
 
-    private async Task SeedPendingDocumentsAsync(CancellationToken ct)
+    /// <summary>
+    /// Step 3: Seed document IDs from content database (Documents_2017.DocumentsContent).
+    /// Only inserts IDs with Status=Seeded, no metadata yet.
+    /// </summary>
+    private async Task SeedDocumentIdsAsync(CancellationToken ct)
     {
-        _logger.LogInformation("Starting seed phase - scanning content database for documents with content...");
+        _logger.LogInformation("=== Step 3: Seeding document IDs from content database ===");
 
         using var scope = _serviceProvider.CreateScope();
         var sourceRepo = scope.ServiceProvider.GetRequiredService<ISourceRepository>();
         var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-        // Step 1: Get DocumentIds that have content in the year-specific database
-        var contentCount = await sourceRepo.GetContentCountAsync(ct);
-        _logger.LogInformation("Found {Count} documents with content in content database", contentCount);
-
+        // Get DocumentIds that have content in the year-specific database
+        _logger.LogInformation("Fetching DocumentIds from {ContentTable}...", _options.ContentTable);
         var documentIdsWithContent = await sourceRepo.GetDocumentIdsWithContentAsync(ct);
-        _logger.LogInformation("Retrieved {Count} unique DocumentIds with content", documentIdsWithContent.Count);
+        _logger.LogInformation("Found {Count} unique DocumentIds with content", documentIdsWithContent.Count);
 
         // Get existing document IDs from migration log (already seeded)
         var existingIds = await migrationContext.MigrationLog
@@ -173,67 +178,125 @@ public class MigrationWorker : BackgroundService
 
         // Filter out already seeded documents
         var newDocumentIds = documentIdsWithContent.Except(existingIds).ToList();
-        _logger.LogInformation("Found {Count} new documents to seed", newDocumentIds.Count);
+        _logger.LogInformation("Found {Count} new document IDs to seed", newDocumentIds.Count);
 
         if (newDocumentIds.Count == 0)
         {
-            _logger.LogInformation("No new documents to seed");
+            _logger.LogInformation("No new document IDs to seed");
             return;
         }
 
-        // Step 2: Batch fetch metadata from main database
+        // Seed IDs in batches (only IDs, no metadata yet)
         var seededCount = 0;
-        var skippedCount = 0;
-        var batchEntries = new List<MigrationLogEntry>();
-
-        // Process in batches to avoid memory issues
         foreach (var batch in newDocumentIds.Chunk(_options.BatchSize))
         {
-            // Get metadata for this batch of DocumentIds
-            var documents = await sourceRepo.GetDocumentsForIdsAsync(batch, ct);
-
-            _logger.LogDebug("Fetched metadata for {Count}/{BatchSize} documents in batch",
-                documents.Count, batch.Length);
-
-            foreach (var document in documents)
+            var entries = batch.Select(docId => new MigrationLogEntry
             {
-                var entry = new MigrationLogEntry
-                {
-                    SourceDocumentId = document.DocumentId,
-                    SourceYear = _options.Year,
-                    OriginalFilename = document.DocumentName,
-                    OriginalExtension = document.DocumentExt?.TrimStart('.'),
-                    ClaimedContentType = document.ContentType,
-                    SourceFileSize = document.FileSize,
-                    SourceRecordDate = document.RecordDate,
-                    Status = MigrationStatus.Pending,
-                    CreatedAtUtc = DateTime.UtcNow
-                };
+                SourceDocumentId = docId,
+                SourceYear = _options.Year,
+                Status = MigrationStatus.Seeded,
+                CreatedAtUtc = DateTime.UtcNow
+            }).ToList();
 
-                batchEntries.Add(entry);
-            }
-
-            // Count documents that had content but no metadata (deleted or missing)
-            skippedCount += batch.Length - documents.Count;
-
-            // Save batch to migration log
-            if (batchEntries.Count > 0)
-            {
-                await migrationContext.MigrationLog.AddRangeAsync(batchEntries, ct);
-                await migrationContext.SaveChangesAsync(ct);
-                seededCount += batchEntries.Count;
-                _logger.LogInformation("Seeded {Count} documents...", seededCount);
-                batchEntries.Clear();
-            }
+            await migrationContext.MigrationLog.AddRangeAsync(entries, ct);
+            await migrationContext.SaveChangesAsync(ct);
+            seededCount += entries.Count;
+            _logger.LogInformation("Seeded {Count}/{Total} document IDs...", seededCount, newDocumentIds.Count);
         }
 
-        _logger.LogInformation("Seed phase complete. Added {Seeded} new documents to migration log, skipped {Skipped} (no metadata)",
-            seededCount, skippedCount);
+        _logger.LogInformation("Seed phase complete. Added {Count} new document IDs to migration log", seededCount);
     }
 
+    /// <summary>
+    /// Step 4: Enrich seeded entries with metadata from source database (Documents.Documents).
+    /// Updates entries from Status=Seeded to Status=Pending.
+    /// </summary>
+    private async Task EnrichMetadataAsync(CancellationToken ct)
+    {
+        _logger.LogInformation("=== Step 4: Enriching with metadata from source database ===");
+
+        using var scope = _serviceProvider.CreateScope();
+        var sourceRepo = scope.ServiceProvider.GetRequiredService<ISourceRepository>();
+        var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
+
+        // Get entries that need metadata enrichment
+        var seededCount = await migrationContext.MigrationLog
+            .Where(l => l.SourceYear == _options.Year && l.Status == MigrationStatus.Seeded)
+            .CountAsync(ct);
+
+        _logger.LogInformation("Found {Count} entries awaiting metadata enrichment", seededCount);
+
+        if (seededCount == 0)
+        {
+            _logger.LogInformation("No entries need metadata enrichment");
+            return;
+        }
+
+        var enrichedCount = 0;
+        var skippedCount = 0;
+
+        // Process in batches
+        while (!ct.IsCancellationRequested)
+        {
+            // Fetch batch of seeded entries
+            var seededEntries = await migrationContext.MigrationLog
+                .Where(l => l.SourceYear == _options.Year && l.Status == MigrationStatus.Seeded)
+                .OrderBy(l => l.SourceDocumentId)
+                .Take(_options.BatchSize)
+                .ToListAsync(ct);
+
+            if (seededEntries.Count == 0)
+                break;
+
+            // Get DocumentIds for this batch
+            var documentIds = seededEntries.Select(e => e.SourceDocumentId).ToList();
+
+            // Fetch metadata from source database
+            var documents = await sourceRepo.GetDocumentsForIdsAsync(documentIds, ct);
+            var documentsDict = documents.ToDictionary(d => d.DocumentId);
+
+            _logger.LogDebug("Fetched metadata for {Found}/{Requested} documents",
+                documents.Count, documentIds.Count);
+
+            // Update entries with metadata
+            foreach (var entry in seededEntries)
+            {
+                if (documentsDict.TryGetValue(entry.SourceDocumentId, out var doc))
+                {
+                    entry.OriginalFilename = doc.DocumentName;
+                    entry.OriginalExtension = doc.DocumentExt?.TrimStart('.');
+                    entry.ClaimedContentType = doc.ContentType;
+                    entry.SourceFileSize = doc.FileSize;
+                    entry.SourceRecordDate = doc.RecordDate;
+                    entry.Status = MigrationStatus.Pending;
+                    enrichedCount++;
+                }
+                else
+                {
+                    // No metadata found - mark as skipped
+                    entry.Status = MigrationStatus.Skipped;
+                    entry.ErrorMessage = "No metadata found in source database";
+                    entry.ProcessedAtUtc = DateTime.UtcNow;
+                    skippedCount++;
+                }
+            }
+
+            await migrationContext.SaveChangesAsync(ct);
+            _logger.LogInformation("Enriched {Enriched} entries, skipped {Skipped}...",
+                enrichedCount, skippedCount);
+        }
+
+        _logger.LogInformation("Metadata enrichment complete. Enriched: {Enriched}, Skipped: {Skipped}",
+            enrichedCount, skippedCount);
+    }
+
+    /// <summary>
+    /// Step 5: Migrate documents to API.
+    /// Fetches blob from content database and uploads to BlobStorage API.
+    /// </summary>
     private async Task MigrateDocumentsAsync(CancellationToken ct)
     {
-        _logger.LogInformation("Starting migration phase...");
+        _logger.LogInformation("=== Step 5: Migrating documents to API ===");
 
         using var semaphore = new SemaphoreSlim(_options.MaxParallelism);
         var processedCount = 0;
@@ -246,7 +309,7 @@ public class MigrationWorker : BackgroundService
             using var scope = _serviceProvider.CreateScope();
             var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-            // Fetch pending batch
+            // Fetch pending batch (only entries with metadata - Status=Pending)
             var pendingEntries = await migrationContext.MigrationLog
                 .Where(l => l.SourceYear == _options.Year &&
                            (l.Status == MigrationStatus.Pending ||
@@ -333,8 +396,9 @@ public class MigrationWorker : BackgroundService
             }
 
             // Build target filename: {SourceDocumentId}/{OriginalName}.{ClaimedExtension}
+            var filename = entry.OriginalFilename ?? entry.SourceDocumentId.ToString();
             var extension = string.IsNullOrEmpty(entry.OriginalExtension) ? "" : $".{entry.OriginalExtension}";
-            var targetFilename = $"{entry.SourceDocumentId}/{entry.OriginalFilename}{extension}";
+            var targetFilename = $"{entry.SourceDocumentId}/{filename}{extension}";
 
             // Upload to API
             var result = await apiClient.UploadAsync(
