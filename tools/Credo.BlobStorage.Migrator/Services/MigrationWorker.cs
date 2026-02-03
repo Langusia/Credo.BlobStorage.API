@@ -152,47 +152,48 @@ public class MigrationWorker : BackgroundService
     }
 
     /// <summary>
-    /// Step 3: Seed document IDs from content database (Documents_2017.DocumentsContent).
+    /// Step 3: Seed ContentIds from content database (Documents_2017.DocumentsContent.Id).
     /// Only inserts IDs with Status=Seeded, no metadata yet.
+    /// SourceDocumentId field stores the ContentId (DocumentsContent.Id).
     /// </summary>
     private async Task SeedDocumentIdsAsync(CancellationToken ct)
     {
-        _logger.LogInformation("=== Step 3: Seeding document IDs from content database ===");
+        _logger.LogInformation("=== Step 3: Seeding ContentIds from content database ===");
 
         using var scope = _serviceProvider.CreateScope();
         var sourceRepo = scope.ServiceProvider.GetRequiredService<ISourceRepository>();
         var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-        // Get DocumentIds that have content in the year-specific database
-        _logger.LogInformation("Fetching DocumentIds from {ContentTable}...", _options.ContentTable);
-        var documentIdsWithContent = await sourceRepo.GetDocumentIdsWithContentAsync(ct);
-        _logger.LogInformation("Found {Count} unique DocumentIds with content", documentIdsWithContent.Count);
+        // Get ContentIds (DocumentsContent.Id) from the year-specific database
+        _logger.LogInformation("Fetching ContentIds from {ContentTable}...", _options.ContentTable);
+        var contentIds = await sourceRepo.GetContentIdsAsync(ct);
+        _logger.LogInformation("Found {Count} unique ContentIds with content", contentIds.Count);
 
-        // Get existing document IDs from migration log (already seeded)
+        // Get existing ContentIds from migration log (already seeded)
         var existingIds = await migrationContext.MigrationLog
             .Where(l => l.SourceYear == _options.Year)
-            .Select(l => l.SourceDocumentId)
+            .Select(l => l.SourceDocumentId)  // SourceDocumentId stores ContentId
             .ToHashSetAsync(ct);
 
-        _logger.LogInformation("Found {Count} documents already in migration log", existingIds.Count);
+        _logger.LogInformation("Found {Count} entries already in migration log", existingIds.Count);
 
-        // Filter out already seeded documents
-        var newDocumentIds = documentIdsWithContent.Except(existingIds).ToList();
-        _logger.LogInformation("Found {Count} new document IDs to seed", newDocumentIds.Count);
+        // Filter out already seeded
+        var newContentIds = contentIds.Except(existingIds).ToList();
+        _logger.LogInformation("Found {Count} new ContentIds to seed", newContentIds.Count);
 
-        if (newDocumentIds.Count == 0)
+        if (newContentIds.Count == 0)
         {
-            _logger.LogInformation("No new document IDs to seed");
+            _logger.LogInformation("No new ContentIds to seed");
             return;
         }
 
         // Seed IDs in batches (only IDs, no metadata yet)
         var seededCount = 0;
-        foreach (var batch in newDocumentIds.Chunk(_options.BatchSize))
+        foreach (var batch in newContentIds.Chunk(_options.BatchSize))
         {
-            var entries = batch.Select(docId => new MigrationLogEntry
+            var entries = batch.Select(contentId => new MigrationLogEntry
             {
-                SourceDocumentId = docId,
+                SourceDocumentId = contentId,  // Stores ContentId (DocumentsContent.Id)
                 SourceYear = _options.Year,
                 Status = MigrationStatus.Seeded,
                 CreatedAtUtc = DateTime.UtcNow
@@ -201,14 +202,15 @@ public class MigrationWorker : BackgroundService
             await migrationContext.MigrationLog.AddRangeAsync(entries, ct);
             await migrationContext.SaveChangesAsync(ct);
             seededCount += entries.Count;
-            _logger.LogInformation("Seeded {Count}/{Total} document IDs...", seededCount, newDocumentIds.Count);
+            _logger.LogInformation("Seeded {Count}/{Total} ContentIds...", seededCount, newContentIds.Count);
         }
 
-        _logger.LogInformation("Seed phase complete. Added {Count} new document IDs to migration log", seededCount);
+        _logger.LogInformation("Seed phase complete. Added {Count} new ContentIds to migration log", seededCount);
     }
 
     /// <summary>
     /// Step 4: Enrich seeded entries with metadata from source database (Documents.Documents).
+    /// Matches Documents.ContentId = seeded ContentId (stored in SourceDocumentId).
     /// Updates entries from Status=Seeded to Status=Pending.
     /// </summary>
     private async Task EnrichMetadataAsync(CancellationToken ct)
@@ -248,15 +250,16 @@ public class MigrationWorker : BackgroundService
             if (seededEntries.Count == 0)
                 break;
 
-            // Get DocumentIds for this batch
-            var documentIds = seededEntries.Select(e => e.SourceDocumentId).ToList();
+            // Get ContentIds for this batch (stored in SourceDocumentId)
+            var contentIds = seededEntries.Select(e => e.SourceDocumentId).ToList();
 
-            // Fetch metadata from source database
-            var documents = await sourceRepo.GetDocumentsForIdsAsync(documentIds, ct);
-            var documentsDict = documents.ToDictionary(d => d.DocumentId);
+            // Fetch metadata from source database where Documents.ContentId matches
+            var documents = await sourceRepo.GetDocumentsForContentIdsAsync(contentIds, ct);
+            // Key by ContentId since that's what we're matching
+            var documentsDict = documents.ToDictionary(d => d.ContentId);
 
-            _logger.LogDebug("Fetched metadata for {Found}/{Requested} documents",
-                documents.Count, documentIds.Count);
+            _logger.LogDebug("Fetched metadata for {Found}/{Requested} ContentIds",
+                documents.Count, contentIds.Count);
 
             // Update entries with metadata
             foreach (var entry in seededEntries)
@@ -275,7 +278,7 @@ public class MigrationWorker : BackgroundService
                 {
                     // No metadata found - mark as skipped
                     entry.Status = MigrationStatus.Skipped;
-                    entry.ErrorMessage = "No metadata found in source database";
+                    entry.ErrorMessage = "No metadata found in source database (no Documents.ContentId match)";
                     entry.ProcessedAtUtc = DateTime.UtcNow;
                     skippedCount++;
                 }

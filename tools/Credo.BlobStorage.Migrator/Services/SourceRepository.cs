@@ -6,8 +6,10 @@ namespace Credo.BlobStorage.Migrator.Services;
 /// <summary>
 /// Repository for accessing source documents from SQL Server.
 /// Uses two databases:
-/// - SourceDbContext: Main Documents DB with metadata (Documents_{Year} tables)
+/// - SourceDbContext: Main Documents DB with metadata (Documents table)
 /// - ContentDbContext: Year-specific DB with content (DocumentsContent table)
+///
+/// Binding: Documents.ContentId = DocumentsContent.Id
 /// </summary>
 public class SourceRepository : ISourceRepository
 {
@@ -21,13 +23,14 @@ public class SourceRepository : ISourceRepository
     }
 
     /// <inheritdoc />
-    public async Task<HashSet<long>> GetDocumentIdsWithContentAsync(CancellationToken ct = default)
+    public async Task<HashSet<long>> GetContentIdsAsync(CancellationToken ct = default)
     {
-        // Get all DocumentIds from content database that have content
+        // Get all Id values from content database (DocumentsContent.Id)
+        // This is the primary key that links to Documents.ContentId
         var ids = await _contentContext.DocumentContents
             .AsNoTracking()
-            .Where(c => c.DocumentId != null && c.Documents != null)
-            .Select(c => c.DocumentId!.Value)
+            .Where(c => c.Documents != null)
+            .Select(c => c.Id)
             .Distinct()
             .ToListAsync(ct);
 
@@ -38,54 +41,48 @@ public class SourceRepository : ISourceRepository
     public async Task<int> GetContentCountAsync(CancellationToken ct = default)
     {
         return await _contentContext.DocumentContents
-            .Where(c => c.DocumentId != null && c.Documents != null)
+            .Where(c => c.Documents != null)
             .CountAsync(ct);
     }
 
     /// <inheritdoc />
-    public async Task<SourceDocument?> GetDocumentAsync(long documentId, CancellationToken ct = default)
+    public async Task<List<SourceDocument>> GetDocumentsForContentIdsAsync(IEnumerable<long> contentIds, CancellationToken ct = default)
     {
+        var idList = contentIds.ToList();
+
+        // Query Documents where ContentId matches the DocumentsContent.Id values
         return await _metadataContext.Documents
             .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.DocumentId == documentId, ct);
-    }
-
-    /// <inheritdoc />
-    public async Task<List<SourceDocument>> GetDocumentsForIdsAsync(IEnumerable<long> documentIds, CancellationToken ct = default)
-    {
-        var idList = documentIds.ToList();
-
-        return await _metadataContext.Documents
-            .AsNoTracking()
-            .Where(d => idList.Contains(d.DocumentId) && !d.DelStatus)
+            .Where(d => idList.Contains(d.ContentId) && !d.DelStatus)
             .ToListAsync(ct);
     }
 
     /// <inheritdoc />
-    public async Task<byte[]?> GetDocumentContentAsync(long documentId, CancellationToken ct = default)
+    public async Task<byte[]?> GetDocumentContentAsync(long contentId, CancellationToken ct = default)
     {
+        // Query by Id (primary key of DocumentsContent)
         var content = await _contentContext.DocumentContents
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.DocumentId == documentId, ct);
+            .FirstOrDefaultAsync(c => c.Id == contentId, ct);
 
         return content?.Documents;
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<long> StreamDocumentIdsWithContentAsync(
+    public async IAsyncEnumerable<long> StreamContentIdsAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        // Stream DocumentIds from content database
-        await foreach (var documentId in _contentContext.DocumentContents
+        // Stream Id values from content database (DocumentsContent.Id)
+        await foreach (var id in _contentContext.DocumentContents
             .AsNoTracking()
-            .Where(c => c.DocumentId != null && c.Documents != null)
-            .Select(c => c.DocumentId!.Value)
+            .Where(c => c.Documents != null)
+            .Select(c => c.Id)
             .Distinct()
             .OrderBy(id => id)
             .AsAsyncEnumerable()
             .WithCancellation(ct))
         {
-            yield return documentId;
+            yield return id;
         }
     }
 }

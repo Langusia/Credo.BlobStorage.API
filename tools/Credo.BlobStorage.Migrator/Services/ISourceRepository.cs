@@ -5,14 +5,16 @@ namespace Credo.BlobStorage.Migrator.Services;
 /// <summary>
 /// Repository for accessing source documents from SQL Server.
 /// Uses two databases: main Documents DB for metadata and year-specific DB for content.
+///
+/// Binding: Documents.ContentId = DocumentsContent.Id
 /// </summary>
 public interface ISourceRepository
 {
     /// <summary>
-    /// Gets all DocumentIds from the content database that have content.
-    /// This determines which documents can actually be migrated.
+    /// Gets all Id values from DocumentsContent table (primary key).
+    /// These IDs link to Documents.ContentId for metadata lookup.
     /// </summary>
-    Task<HashSet<long>> GetDocumentIdsWithContentAsync(CancellationToken ct = default);
+    Task<HashSet<long>> GetContentIdsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Gets count of documents with content in the year-specific database.
@@ -20,23 +22,19 @@ public interface ISourceRepository
     Task<int> GetContentCountAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Gets document metadata by ID from the main database.
-    /// </summary>
-    Task<SourceDocument?> GetDocumentAsync(long documentId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Gets document metadata for multiple IDs from the main database (batch query).
+    /// Gets document metadata for multiple ContentIds from the main database.
+    /// Queries Documents where ContentId IN (...).
     /// Only returns documents that are not deleted.
     /// </summary>
-    Task<List<SourceDocument>> GetDocumentsForIdsAsync(IEnumerable<long> documentIds, CancellationToken ct = default);
+    Task<List<SourceDocument>> GetDocumentsForContentIdsAsync(IEnumerable<long> contentIds, CancellationToken ct = default);
 
     /// <summary>
-    /// Gets document content by DocumentId from the content database.
+    /// Gets document content by Id (DocumentsContent.Id primary key).
     /// </summary>
-    Task<byte[]?> GetDocumentContentAsync(long documentId, CancellationToken ct = default);
+    Task<byte[]?> GetDocumentContentAsync(long contentId, CancellationToken ct = default);
 
     /// <summary>
-    /// Streams DocumentIds from the content database in batches.
+    /// Streams Id values from DocumentsContent table.
     /// </summary>
-    IAsyncEnumerable<long> StreamDocumentIdsWithContentAsync(CancellationToken ct = default);
+    IAsyncEnumerable<long> StreamContentIdsAsync(CancellationToken ct = default);
 }
