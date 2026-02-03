@@ -347,10 +347,38 @@ WHERE SourceYear = @Year
                 return MigrationStatus.Skipped;
             }
 
-            // Build target filename: {SourceDocumentId}/{OriginalName}.{ClaimedExtension}
-            var filename = entry.OriginalFilename ?? entry.SourceDocumentId.ToString();
-            var extension = string.IsNullOrEmpty(entry.OriginalExtension) ? "" : $".{entry.OriginalExtension}";
-            var targetFilename = $"{entry.SourceDocumentId}/{filename}{extension}";
+            // Build target filename: {SourceDocumentId}/{OriginalName}.{ext}
+            // Handle extensions properly to avoid duplicates like "IMG_0699.JPG.JPG"
+            var baseFilename = entry.OriginalFilename ?? entry.SourceDocumentId.ToString();
+            var existingExt = Path.GetExtension(baseFilename); // includes dot, e.g., ".JPG"
+            var detectedExt = string.IsNullOrEmpty(entry.OriginalExtension)
+                ? ""
+                : $".{entry.OriginalExtension}";
+
+            string finalFilename;
+            if (string.IsNullOrEmpty(existingExt))
+            {
+                // No extension in filename → append detected extension
+                finalFilename = baseFilename + detectedExt;
+            }
+            else if (existingExt.Equals(detectedExt, StringComparison.OrdinalIgnoreCase))
+            {
+                // Extension matches (case-insensitive) → keep filename as-is
+                finalFilename = baseFilename;
+            }
+            else if (!string.IsNullOrEmpty(detectedExt))
+            {
+                // Extension differs → replace with detected extension
+                var nameWithoutExt = Path.GetFileNameWithoutExtension(baseFilename);
+                finalFilename = nameWithoutExt + detectedExt;
+            }
+            else
+            {
+                // No detected extension → keep filename as-is
+                finalFilename = baseFilename;
+            }
+
+            var targetFilename = $"{entry.SourceDocumentId}/{finalFilename}";
 
             // Upload to API
             var result = await apiClient.UploadAsync(
