@@ -81,12 +81,17 @@ using (var scope = app.Services.CreateScope())
         // Seed default buckets
         if (storageOptions.DefaultBuckets.Length > 0)
         {
-            logger.LogInformation("Seeding {Count} default bucket(s)...", storageOptions.DefaultBuckets.Length);
+            var bucketsToSeed = storageOptions.DefaultBuckets.Distinct().ToList();
+            logger.LogInformation("Seeding {Count} default bucket(s)...", bucketsToSeed.Count);
 
-            foreach (var bucketName in storageOptions.DefaultBuckets)
+            foreach (var bucketName in bucketsToSeed)
             {
-                var exists = await dbContext.Buckets.AnyAsync(b => b.Name == bucketName);
-                if (!exists)
+                // Check both database and local change tracker
+                var existsInDb = await dbContext.Buckets.AnyAsync(b => b.Name == bucketName);
+                var existsLocally = dbContext.ChangeTracker.Entries<BucketEntity>()
+                    .Any(e => e.Entity.Name == bucketName);
+
+                if (!existsInDb && !existsLocally)
                 {
                     dbContext.Buckets.Add(new BucketEntity
                     {
