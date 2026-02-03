@@ -192,7 +192,7 @@ public class MigrationWorker : BackgroundService
         // Get existing ContentIds from migration log (already seeded)
         var existingIds = await migrationContext.MigrationLog
             .Where(l => l.SourceYear == _options.Year)
-            .Select(l => l.SourceDocumentId)  // SourceDocumentId stores ContentId
+            .Select(l => l.SourceDocumentId)
             .ToHashSetAsync(ct);
 
         _logger.LogInformation("Found {Count} entries already in migration log", existingIds.Count);
@@ -207,25 +207,19 @@ public class MigrationWorker : BackgroundService
             return;
         }
 
-        // Seed IDs in batches (only IDs, no metadata yet)
-        var seededCount = 0;
-        foreach (var batch in newContentIds.Chunk(_options.BatchSize))
+        // Seed all IDs at once - EF Core batches internally
+        var entries = newContentIds.Select(contentId => new MigrationLogEntry
         {
-            var entries = batch.Select(contentId => new MigrationLogEntry
-            {
-                SourceDocumentId = contentId,  // Stores ContentId (DocumentsContent.Id)
-                SourceYear = _options.Year,
-                Status = MigrationStatus.Seeded,
-                CreatedAtUtc = DateTime.UtcNow
-            }).ToList();
+            SourceDocumentId = contentId,
+            SourceYear = _options.Year,
+            Status = MigrationStatus.Seeded,
+            CreatedAtUtc = DateTime.UtcNow
+        }).ToList();
 
-            await migrationContext.MigrationLog.AddRangeAsync(entries, ct);
-            await migrationContext.SaveChangesAsync(ct);
-            seededCount += entries.Count;
-            _logger.LogInformation("Seeded {Count}/{Total} ContentIds...", seededCount, newContentIds.Count);
-        }
+        await migrationContext.MigrationLog.AddRangeAsync(entries, ct);
+        await migrationContext.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Seed phase complete. Added {Count} new ContentIds to migration log", seededCount);
+        _logger.LogInformation("Seed phase complete. Added {Count} new ContentIds to migration log", entries.Count);
     }
 
     /// <summary>
