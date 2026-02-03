@@ -86,12 +86,9 @@ using (var scope = app.Services.CreateScope())
 
             foreach (var bucketName in bucketsToSeed)
             {
-                // Check both database and local change tracker
-                var existsInDb = await dbContext.Buckets.AnyAsync(b => b.Name == bucketName);
-                var existsLocally = dbContext.ChangeTracker.Entries<BucketEntity>()
-                    .Any(e => e.Entity.Name == bucketName);
-
-                if (!existsInDb && !existsLocally)
+                // FindAsync checks both tracker and database
+                var existing = await dbContext.Buckets.FindAsync(bucketName);
+                if (existing == null)
                 {
                     dbContext.Buckets.Add(new BucketEntity
                     {
