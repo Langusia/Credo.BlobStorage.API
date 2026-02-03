@@ -91,13 +91,42 @@ public class MigrationWorker : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-        // Create schema first (EnsureCreated doesn't handle custom schemas)
+        // Create schema and table using raw SQL (EnsureCreated doesn't work on existing databases)
         await context.Database.ExecuteSqlRawAsync(@"
             IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'migration')
-            EXEC('CREATE SCHEMA [migration]')", ct);
+            EXEC('CREATE SCHEMA [migration]');
 
-        // EnsureCreated will create tables based on DbContext model if they don't exist
-        await context.Database.EnsureCreatedAsync(ct);
+            IF NOT EXISTS (SELECT * FROM sys.tables t JOIN sys.schemas s ON t.schema_id = s.schema_id
+                           WHERE s.name = 'migration' AND t.name = 'MigrationLog')
+            BEGIN
+                CREATE TABLE [migration].[MigrationLog] (
+                    [Id] BIGINT IDENTITY(1,1) NOT NULL,
+                    [SourceDocumentId] BIGINT NOT NULL,
+                    [SourceYear] INT NOT NULL,
+                    [OriginalFilename] NVARCHAR(256) NULL,
+                    [OriginalExtension] NVARCHAR(10) NULL,
+                    [ClaimedContentType] NVARCHAR(50) NULL,
+                    [SourceFileSize] BIGINT NULL,
+                    [SourceRecordDate] DATETIME2 NULL,
+                    [Status] INT NOT NULL DEFAULT 0,
+                    [TargetDocId] NVARCHAR(50) NULL,
+                    [TargetBucket] NVARCHAR(63) NULL,
+                    [TargetFilename] NVARCHAR(1024) NULL,
+                    [TargetSha256] NVARCHAR(64) NULL,
+                    [DetectedContentType] NVARCHAR(255) NULL,
+                    [ErrorMessage] NVARCHAR(2000) NULL,
+                    [RetryCount] INT NOT NULL DEFAULT 0,
+                    [CreatedAtUtc] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    [ProcessedAtUtc] DATETIME2 NULL,
+                    CONSTRAINT [PK_MigrationLog] PRIMARY KEY ([Id])
+                );
+
+                CREATE UNIQUE INDEX [UQ_MigrationLog_SourceYear_SourceDocumentId]
+                    ON [migration].[MigrationLog] ([SourceYear], [SourceDocumentId]);
+
+                CREATE INDEX [IX_MigrationLog_Status]
+                    ON [migration].[MigrationLog] ([Status]);
+            END", ct);
 
         _logger.LogInformation("Database schema ready");
     }
