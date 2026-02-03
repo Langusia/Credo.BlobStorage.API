@@ -134,31 +134,11 @@ public class MigrationWorker : BackgroundService
                 CREATE UNIQUE INDEX [UQ_MigrationLog_SourceYear_SourceDocumentId] ON [migration].[MigrationLog] ([SourceYear], [SourceDocumentId])
             END";
 
-        // Alter existing table to make metadata columns nullable (if table already exists with NOT NULL constraints)
-        const string alterTableSql = @"
-            IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[migration].[MigrationLog]') AND type in (N'U'))
-            BEGIN
-                -- Make OriginalFilename nullable if it's NOT NULL
-                IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[migration].[MigrationLog]') AND name = 'OriginalFilename' AND is_nullable = 0)
-                    ALTER TABLE [migration].[MigrationLog] ALTER COLUMN [OriginalFilename] nvarchar(256) NULL
-
-                -- Make SourceFileSize nullable if it's NOT NULL
-                IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[migration].[MigrationLog]') AND name = 'SourceFileSize' AND is_nullable = 0)
-                    ALTER TABLE [migration].[MigrationLog] ALTER COLUMN [SourceFileSize] int NULL
-
-                -- Make SourceRecordDate nullable if it's NOT NULL
-                IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[migration].[MigrationLog]') AND name = 'SourceRecordDate' AND is_nullable = 0)
-                    ALTER TABLE [migration].[MigrationLog] ALTER COLUMN [SourceRecordDate] datetime2 NULL
-            END";
-
         _logger.LogInformation("Ensuring migration schema exists...");
         await context.Database.ExecuteSqlRawAsync(createSchemaSql, ct);
 
         _logger.LogInformation("Ensuring MigrationLog table exists...");
         await context.Database.ExecuteSqlRawAsync(createTableSql, ct);
-
-        _logger.LogInformation("Ensuring columns are nullable for 3-step flow...");
-        await context.Database.ExecuteSqlRawAsync(alterTableSql, ct);
     }
 
     private async Task<bool> EnsureBucketExistsAsync(CancellationToken ct)

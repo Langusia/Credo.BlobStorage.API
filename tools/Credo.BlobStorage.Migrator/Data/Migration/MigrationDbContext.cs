@@ -38,9 +38,10 @@ public class MigrationDbContext : DbContext
             entity.Property(e => e.SourceYear)
                 .IsRequired();
 
+            // Nullable until metadata is enriched
             entity.Property(e => e.OriginalFilename)
                 .HasMaxLength(256)
-                .IsRequired();
+                .IsRequired(false);
 
             entity.Property(e => e.OriginalExtension)
                 .HasMaxLength(10);
@@ -48,15 +49,17 @@ public class MigrationDbContext : DbContext
             entity.Property(e => e.ClaimedContentType)
                 .HasMaxLength(50);
 
+            // Nullable until metadata is enriched
             entity.Property(e => e.SourceFileSize)
-                .IsRequired();
+                .IsRequired(false);
 
+            // Nullable until metadata is enriched
             entity.Property(e => e.SourceRecordDate)
-                .IsRequired();
+                .IsRequired(false);
 
             entity.Property(e => e.Status)
                 .IsRequired()
-                .HasDefaultValue(MigrationStatus.Pending);
+                .HasDefaultValue(MigrationStatus.Seeded);
 
             entity.Property(e => e.TargetDocId)
                 .HasMaxLength(50);
