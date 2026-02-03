@@ -21,9 +21,9 @@ public class MigrationLogEntry
     public int SourceYear { get; set; }
 
     /// <summary>
-    /// Original filename (without extension).
+    /// Original filename (without extension). Null until metadata is enriched.
     /// </summary>
-    public string OriginalFilename { get; set; } = string.Empty;
+    public string? OriginalFilename { get; set; }
 
     /// <summary>
     /// Original claimed extension.
@@ -36,19 +36,19 @@ public class MigrationLogEntry
     public string? ClaimedContentType { get; set; }
 
     /// <summary>
-    /// File size from source.
+    /// File size from source. Null until metadata is enriched.
     /// </summary>
-    public int SourceFileSize { get; set; }
+    public int? SourceFileSize { get; set; }
 
     /// <summary>
-    /// Record date from source.
+    /// Record date from source. Null until metadata is enriched.
     /// </summary>
-    public DateTime SourceRecordDate { get; set; }
+    public DateTime? SourceRecordDate { get; set; }
 
     /// <summary>
     /// Current migration status.
     /// </summary>
-    public MigrationStatus Status { get; set; } = MigrationStatus.Pending;
+    public MigrationStatus Status { get; set; } = MigrationStatus.Seeded;
 
     /// <summary>
     /// Target DocId after successful upload.
