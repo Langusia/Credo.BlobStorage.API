@@ -8,7 +8,7 @@ public class MigrationLogEntry
     /// <summary>
     /// Primary key.
     /// </summary>
-    public int Id { get; set; }
+    public long Id { get; set; }
 
     /// <summary>
     /// Source document ID from SQL Server.
@@ -38,7 +38,7 @@ public class MigrationLogEntry
     /// <summary>
     /// File size from source. Null until metadata is enriched.
     /// </summary>
-    public int? SourceFileSize { get; set; }
+    public long? SourceFileSize { get; set; }
 
     /// <summary>
     /// Record date from source. Null until metadata is enriched.

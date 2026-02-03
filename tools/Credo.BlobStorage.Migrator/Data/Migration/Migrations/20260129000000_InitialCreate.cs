@@ -19,15 +19,15 @@ public partial class InitialCreate : Microsoft.EntityFrameworkCore.Migrations.Mi
             schema: "migration",
             columns: table => new
             {
-                Id = table.Column<int>(type: "int", nullable: false)
+                Id = table.Column<long>(type: "bigint", nullable: false)
                     .Annotation("SqlServer:Identity", "1, 1"),
                 SourceDocumentId = table.Column<long>(type: "bigint", nullable: false),
                 SourceYear = table.Column<int>(type: "int", nullable: false),
-                OriginalFilename = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                OriginalFilename = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                 OriginalExtension = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                 ClaimedContentType = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                SourceFileSize = table.Column<int>(type: "int", nullable: false),
-                SourceRecordDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                SourceFileSize = table.Column<long>(type: "bigint", nullable: true),
+                SourceRecordDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                 Status = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
                 TargetDocId = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                 TargetBucket = table.Column<string>(type: "nvarchar(63)", maxLength: 63, nullable: true),

@@ -25,11 +25,11 @@ partial class MigrationDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("Credo.BlobStorage.Migrator.Data.Migration.MigrationLogEntry", b =>
             {
-                b.Property<int>("Id")
+                b.Property<long>("Id")
                     .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
+                    .HasColumnType("bigint");
 
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
                 b.Property<string>("ClaimedContentType")
                     .HasMaxLength(50)
@@ -53,7 +53,6 @@ partial class MigrationDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("nvarchar(10)");
 
                 b.Property<string>("OriginalFilename")
-                    .IsRequired()
                     .HasMaxLength(256)
                     .HasColumnType("nvarchar(256)");
 
@@ -68,10 +67,10 @@ partial class MigrationDbContextModelSnapshot : ModelSnapshot
                 b.Property<long>("SourceDocumentId")
                     .HasColumnType("bigint");
 
-                b.Property<int>("SourceFileSize")
-                    .HasColumnType("int");
+                b.Property<long?>("SourceFileSize")
+                    .HasColumnType("bigint");
 
-                b.Property<DateTime>("SourceRecordDate")
+                b.Property<DateTime?>("SourceRecordDate")
                     .HasColumnType("datetime2");
 
                 b.Property<int>("SourceYear")
