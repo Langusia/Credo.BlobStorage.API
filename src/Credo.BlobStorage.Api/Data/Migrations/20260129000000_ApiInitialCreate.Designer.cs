@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Credo.BlobStorage.Api.Data.Migrations
 {
     [DbContext(typeof(BlobStorageDbContext))]
-    [Migration("20260129000000_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260129000000_ApiInitialCreate")]
+    partial class ApiInitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
