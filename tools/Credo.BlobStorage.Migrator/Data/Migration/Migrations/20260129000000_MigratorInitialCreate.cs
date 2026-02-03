@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Credo.BlobStorage.Migrator.Data.Migration.Migrations;
 
 /// <inheritdoc />
-public partial class InitialCreate : Microsoft.EntityFrameworkCore.Migrations.Migration
+public partial class MigratorInitialCreate : Microsoft.EntityFrameworkCore.Migrations.Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
