@@ -25,11 +25,6 @@ public class MigrationOptions
     public string TargetApiBaseUrl { get; set; } = "http://localhost:5000";
 
     /// <summary>
-    /// SQL Server connection string for the migration log database.
-    /// </summary>
-    public string MigrationDbConnectionString { get; set; } = string.Empty;
-
-    /// <summary>
     /// Year being migrated (used for table names and DocId generation).
     /// </summary>
     public int Year { get; set; }

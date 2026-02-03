@@ -159,14 +159,14 @@ public class MigrationWorker : BackgroundService
     }
 
     /// <summary>
-    /// Step 4: Enrich seeded entries with metadata from source database.
-    /// Uses raw SQL UPDATE with cross-database JOIN for efficiency.
+    /// Step 4: Enrich seeded entries with metadata from Documents table.
+    /// Uses raw SQL UPDATE with JOIN for efficiency (same database).
     /// Matches Documents.ContentId = seeded ContentId (stored in SourceDocumentId).
     /// Updates entries from Status=Seeded to Status=Pending.
     /// </summary>
     private async Task EnrichMetadataAsync(CancellationToken ct)
     {
-        _logger.LogInformation("=== Step 4: Enriching with metadata from source database ===");
+        _logger.LogInformation("=== Step 4: Enriching with metadata from Documents table ===");
 
         using var scope = _serviceProvider.CreateScope();
         var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
@@ -184,15 +184,11 @@ public class MigrationWorker : BackgroundService
             return;
         }
 
-        // Extract database name from source connection string for cross-database query
-        var sourceDb = ExtractDatabaseName(_options.SourceConnectionString);
-        var migrationDb = ExtractDatabaseName(_options.MigrationDbConnectionString);
         var documentsTable = _options.DocumentsTable;
-
-        _logger.LogInformation("Enriching metadata from [{SourceDb}].[dbo].[{Table}]...", sourceDb, documentsTable);
+        _logger.LogInformation("Enriching metadata from [dbo].[{Table}]...", documentsTable);
 
         // Use raw SQL UPDATE with JOIN - runs entirely on the database server
-        // This avoids loading data into memory and is much faster for large datasets
+        // MigrationLog and Documents are in the same database, just different schemas
         var enrichSql = $@"
             UPDATE ml
             SET
@@ -206,8 +202,8 @@ public class MigrationWorker : BackgroundService
                 ml.SourceFileSize = d.FileSize,
                 ml.SourceRecordDate = d.RecordDate,
                 ml.Status = {(int)MigrationStatus.Pending}
-            FROM [{migrationDb}].[migration].[MigrationLog] ml
-            INNER JOIN [{sourceDb}].[dbo].[{documentsTable}] d
+            FROM [migration].[MigrationLog] ml
+            INNER JOIN [dbo].[{documentsTable}] d
                 ON ml.SourceDocumentId = d.ContentId
             WHERE ml.SourceYear = @Year
                 AND ml.Status = {(int)MigrationStatus.Seeded}
@@ -222,7 +218,7 @@ public class MigrationWorker : BackgroundService
 
         // Mark remaining seeded entries (no matching metadata) as skipped
         var skipSql = $@"
-            UPDATE [{migrationDb}].[migration].[MigrationLog]
+            UPDATE [migration].[MigrationLog]
             SET
                 Status = {(int)MigrationStatus.Skipped},
                 ErrorMessage = 'No metadata found in source database (no Documents.ContentId match)',
@@ -242,15 +238,6 @@ public class MigrationWorker : BackgroundService
 
         _logger.LogInformation("Metadata enrichment complete. Enriched: {Enriched}, Skipped: {Skipped}",
             enrichedCount, skippedCount);
-    }
-
-    /// <summary>
-    /// Extracts database name from a SQL Server connection string.
-    /// </summary>
-    private static string ExtractDatabaseName(string connectionString)
-    {
-        var builder = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connectionString);
-        return builder.InitialCatalog;
     }
 
     /// <summary>
