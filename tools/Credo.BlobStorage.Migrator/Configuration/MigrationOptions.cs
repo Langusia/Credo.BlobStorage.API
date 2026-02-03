@@ -8,9 +8,16 @@ public class MigrationOptions
     public const string SectionName = "Migration";
 
     /// <summary>
-    /// SQL Server connection string for the source database.
+    /// SQL Server connection string for the source metadata database (main Documents DB).
+    /// Contains Documents_{Year} tables with document metadata.
     /// </summary>
     public string SourceConnectionString { get; set; } = string.Empty;
+
+    /// <summary>
+    /// SQL Server connection string for the content database (year-specific DB, e.g., Documents_2017).
+    /// Contains DocumentsContent table with actual blob data.
+    /// </summary>
+    public string ContentConnectionString { get; set; } = string.Empty;
 
     /// <summary>
     /// Base URL of the BlobStorage API.
@@ -18,7 +25,7 @@ public class MigrationOptions
     public string TargetApiBaseUrl { get; set; } = "http://localhost:5000";
 
     /// <summary>
-    /// PostgreSQL connection string for the migration log database.
+    /// SQL Server connection string for the migration log database.
     /// </summary>
     public string MigrationDbConnectionString { get; set; } = string.Empty;
 
@@ -28,14 +35,14 @@ public class MigrationOptions
     public int Year { get; set; }
 
     /// <summary>
-    /// Name of the source documents table (e.g., "Documents_2020").
+    /// Name of the source documents table in the metadata database (e.g., "Documents_2017").
     /// </summary>
     public string DocumentsTable { get; set; } = string.Empty;
 
     /// <summary>
-    /// Name of the source content table (e.g., "DocumentsContent_2020").
+    /// Name of the source content table in the content database (e.g., "DocumentsContent").
     /// </summary>
-    public string ContentTable { get; set; } = string.Empty;
+    public string ContentTable { get; set; } = "DocumentsContent";
 
     /// <summary>
     /// Target bucket name in the BlobStorage API.

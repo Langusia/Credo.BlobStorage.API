@@ -5,8 +5,8 @@ using Microsoft.Extensions.Options;
 namespace Credo.BlobStorage.Migrator.Data.Source;
 
 /// <summary>
-/// Entity Framework context for the source SQL Server database.
-/// Uses dynamic table names from configuration.
+/// Entity Framework context for the main Documents database.
+/// Contains document metadata in Documents_{Year} tables.
 /// </summary>
 public class SourceDbContext : DbContext
 {
@@ -21,13 +21,12 @@ public class SourceDbContext : DbContext
     }
 
     public DbSet<SourceDocument> Documents => Set<SourceDocument>();
-    public DbSet<SourceDocumentContent> DocumentContents => Set<SourceDocumentContent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure Documents entity with dynamic table name
+        // Configure Documents entity with dynamic table name (e.g., Documents_2017)
         modelBuilder.Entity<SourceDocument>(entity =>
         {
             entity.ToTable(_options.DocumentsTable);
@@ -57,19 +56,6 @@ public class SourceDbContext : DbContext
 
             entity.Property(e => e.ContentId)
                 .HasColumnName("ContentId");
-        });
-
-        // Configure DocumentContent entity with dynamic table name
-        modelBuilder.Entity<SourceDocumentContent>(entity =>
-        {
-            entity.ToTable(_options.ContentTable);
-            entity.HasKey(e => e.DocumentId);
-
-            entity.Property(e => e.DocumentId)
-                .HasColumnName("DocumentId");
-
-            entity.Property(e => e.Documents)
-                .HasColumnType("varbinary(max)");
         });
     }
 }

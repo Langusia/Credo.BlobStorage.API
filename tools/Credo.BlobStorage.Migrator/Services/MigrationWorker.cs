@@ -38,8 +38,8 @@ public class MigrationWorker : BackgroundService
         try
         {
             _logger.LogInformation("Starting migration for year {Year}", _options.Year);
-            _logger.LogInformation("Source tables: {DocumentsTable}, {ContentTable}",
-                _options.DocumentsTable, _options.ContentTable);
+            _logger.LogInformation("Metadata source: {DocumentsTable} (main Documents DB)", _options.DocumentsTable);
+            _logger.LogInformation("Content source: {ContentTable} (Documents_{Year} DB)", _options.ContentTable, _options.Year);
             _logger.LogInformation("Target bucket: {Bucket}", _options.TargetBucket);
             _logger.LogInformation("Batch size: {BatchSize}, Max parallelism: {MaxParallelism}",
                 _options.BatchSize, _options.MaxParallelism);
@@ -150,16 +150,20 @@ public class MigrationWorker : BackgroundService
 
     private async Task SeedPendingDocumentsAsync(CancellationToken ct)
     {
-        _logger.LogInformation("Starting seed phase - scanning source documents...");
+        _logger.LogInformation("Starting seed phase - scanning content database for documents with content...");
 
         using var scope = _serviceProvider.CreateScope();
         var sourceRepo = scope.ServiceProvider.GetRequiredService<ISourceRepository>();
         var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-        var sourceCount = await sourceRepo.GetDocumentCountAsync(ct);
-        _logger.LogInformation("Found {Count} non-deleted documents in source", sourceCount);
+        // Step 1: Get DocumentIds that have content in the year-specific database
+        var contentCount = await sourceRepo.GetContentCountAsync(ct);
+        _logger.LogInformation("Found {Count} documents with content in content database", contentCount);
 
-        // Get existing document IDs from migration log
+        var documentIdsWithContent = await sourceRepo.GetDocumentIdsWithContentAsync(ct);
+        _logger.LogInformation("Retrieved {Count} unique DocumentIds with content", documentIdsWithContent.Count);
+
+        // Get existing document IDs from migration log (already seeded)
         var existingIds = await migrationContext.MigrationLog
             .Where(l => l.SourceYear == _options.Year)
             .Select(l => l.SourceDocumentId)
@@ -167,30 +171,53 @@ public class MigrationWorker : BackgroundService
 
         _logger.LogInformation("Found {Count} documents already in migration log", existingIds.Count);
 
+        // Filter out already seeded documents
+        var newDocumentIds = documentIdsWithContent.Except(existingIds).ToList();
+        _logger.LogInformation("Found {Count} new documents to seed", newDocumentIds.Count);
+
+        if (newDocumentIds.Count == 0)
+        {
+            _logger.LogInformation("No new documents to seed");
+            return;
+        }
+
+        // Step 2: Batch fetch metadata from main database
         var seededCount = 0;
+        var skippedCount = 0;
         var batchEntries = new List<MigrationLogEntry>();
 
-        await foreach (var document in sourceRepo.GetDocumentsAsync(ct))
+        // Process in batches to avoid memory issues
+        foreach (var batch in newDocumentIds.Chunk(_options.BatchSize))
         {
-            if (existingIds.Contains(document.DocumentId))
-                continue;
+            // Get metadata for this batch of DocumentIds
+            var documents = await sourceRepo.GetDocumentsForIdsAsync(batch, ct);
 
-            var entry = new MigrationLogEntry
+            _logger.LogDebug("Fetched metadata for {Count}/{BatchSize} documents in batch",
+                documents.Count, batch.Length);
+
+            foreach (var document in documents)
             {
-                SourceDocumentId = document.DocumentId,
-                SourceYear = _options.Year,
-                OriginalFilename = document.DocumentName,
-                OriginalExtension = document.DocumentExt?.TrimStart('.'),
-                ClaimedContentType = document.ContentType,
-                SourceFileSize = document.FileSize,
-                SourceRecordDate = document.RecordDate,
-                Status = MigrationStatus.Pending,
-                CreatedAtUtc = DateTime.UtcNow
-            };
+                var entry = new MigrationLogEntry
+                {
+                    SourceDocumentId = document.DocumentId,
+                    SourceYear = _options.Year,
+                    OriginalFilename = document.DocumentName,
+                    OriginalExtension = document.DocumentExt?.TrimStart('.'),
+                    ClaimedContentType = document.ContentType,
+                    SourceFileSize = document.FileSize,
+                    SourceRecordDate = document.RecordDate,
+                    Status = MigrationStatus.Pending,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
 
-            batchEntries.Add(entry);
+                batchEntries.Add(entry);
+            }
 
-            if (batchEntries.Count >= _options.BatchSize)
+            // Count documents that had content but no metadata (deleted or missing)
+            skippedCount += batch.Length - documents.Count;
+
+            // Save batch to migration log
+            if (batchEntries.Count > 0)
             {
                 await migrationContext.MigrationLog.AddRangeAsync(batchEntries, ct);
                 await migrationContext.SaveChangesAsync(ct);
@@ -200,15 +227,8 @@ public class MigrationWorker : BackgroundService
             }
         }
 
-        // Save remaining entries
-        if (batchEntries.Count > 0)
-        {
-            await migrationContext.MigrationLog.AddRangeAsync(batchEntries, ct);
-            await migrationContext.SaveChangesAsync(ct);
-            seededCount += batchEntries.Count;
-        }
-
-        _logger.LogInformation("Seed phase complete. Added {Count} new documents to migration log", seededCount);
+        _logger.LogInformation("Seed phase complete. Added {Seeded} new documents to migration log, skipped {Skipped} (no metadata)",
+            seededCount, skippedCount);
     }
 
     private async Task MigrateDocumentsAsync(CancellationToken ct)

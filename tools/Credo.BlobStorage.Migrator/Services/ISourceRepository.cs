@@ -4,31 +4,39 @@ namespace Credo.BlobStorage.Migrator.Services;
 
 /// <summary>
 /// Repository for accessing source documents from SQL Server.
+/// Uses two databases: main Documents DB for metadata and year-specific DB for content.
 /// </summary>
 public interface ISourceRepository
 {
     /// <summary>
-    /// Gets all non-deleted document IDs from the source database.
+    /// Gets all DocumentIds from the content database that have content.
+    /// This determines which documents can actually be migrated.
     /// </summary>
-    Task<List<long>> GetAllDocumentIdsAsync(CancellationToken ct = default);
+    Task<HashSet<long>> GetDocumentIdsWithContentAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Gets document metadata by ID.
+    /// Gets count of documents with content in the year-specific database.
+    /// </summary>
+    Task<int> GetContentCountAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets document metadata by ID from the main database.
     /// </summary>
     Task<SourceDocument?> GetDocumentAsync(long documentId, CancellationToken ct = default);
 
     /// <summary>
-    /// Gets document content by ID.
+    /// Gets document metadata for multiple IDs from the main database (batch query).
+    /// Only returns documents that are not deleted.
+    /// </summary>
+    Task<List<SourceDocument>> GetDocumentsForIdsAsync(IEnumerable<long> documentIds, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets document content by DocumentId from the content database.
     /// </summary>
     Task<byte[]?> GetDocumentContentAsync(long documentId, CancellationToken ct = default);
 
     /// <summary>
-    /// Gets documents in batches for seeding.
+    /// Streams DocumentIds from the content database in batches.
     /// </summary>
-    IAsyncEnumerable<SourceDocument> GetDocumentsAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Gets count of non-deleted documents.
-    /// </summary>
-    Task<int> GetDocumentCountAsync(CancellationToken ct = default);
+    IAsyncEnumerable<long> StreamDocumentIdsWithContentAsync(CancellationToken ct = default);
 }
