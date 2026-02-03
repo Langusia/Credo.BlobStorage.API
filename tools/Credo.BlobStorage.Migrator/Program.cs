@@ -49,10 +49,11 @@ try
         options.UseSqlServer(migrationOptions.ContentConnectionString);
     });
 
-    // Register Migration DbContext (SQL Server - migration log under 'migration' schema)
+    // Register Migration DbContext (SQL Server - migration log in same DB as source Documents)
+    // Uses 'migration' schema to keep tables separate
     builder.Services.AddDbContext<MigrationDbContext>(options =>
     {
-        options.UseSqlServer(migrationOptions.MigrationDbConnectionString, sqlOptions =>
+        options.UseSqlServer(migrationOptions.SourceConnectionString, sqlOptions =>
         {
             // Use simple assembly name (not FullName which includes version info)
             sqlOptions.MigrationsAssembly(typeof(MigrationDbContext).Assembly.GetName().Name);

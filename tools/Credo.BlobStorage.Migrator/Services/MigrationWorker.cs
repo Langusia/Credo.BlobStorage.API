@@ -159,19 +159,19 @@ public class MigrationWorker : BackgroundService
     }
 
     /// <summary>
-    /// Step 4: Enrich seeded entries with metadata from source database (Documents.Documents).
+    /// Step 4: Enrich seeded entries with metadata from Documents table.
+    /// Uses raw SQL UPDATE with JOIN for efficiency (same database).
     /// Matches Documents.ContentId = seeded ContentId (stored in SourceDocumentId).
     /// Updates entries from Status=Seeded to Status=Pending.
     /// </summary>
     private async Task EnrichMetadataAsync(CancellationToken ct)
     {
-        _logger.LogInformation("=== Step 4: Enriching with metadata from source database ===");
+        _logger.LogInformation("=== Step 4: Enriching with metadata from Documents table ===");
 
         using var scope = _serviceProvider.CreateScope();
-        var sourceRepo = scope.ServiceProvider.GetRequiredService<ISourceRepository>();
         var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-        // Get entries that need metadata enrichment
+        // Get count of entries that need metadata enrichment
         var seededCount = await migrationContext.MigrationLog
             .Where(l => l.SourceYear == _options.Year && l.Status == MigrationStatus.Seeded)
             .CountAsync(ct);
@@ -184,59 +184,56 @@ public class MigrationWorker : BackgroundService
             return;
         }
 
-        var enrichedCount = 0;
-        var skippedCount = 0;
+        var documentsTable = _options.DocumentsTable;
+        _logger.LogInformation("Enriching metadata from [dbo].[{Table}]...", documentsTable);
 
-        // Process in batches
-        while (!ct.IsCancellationRequested)
+        // Use raw SQL UPDATE with JOIN - runs entirely on the database server
+        // MigrationLog and Documents are in the same database, just different schemas
+        var enrichSql = $@"
+            UPDATE ml
+            SET
+                ml.OriginalFilename = d.DocumentName,
+                ml.OriginalExtension = CASE
+                    WHEN d.DocumentExt IS NULL THEN NULL
+                    WHEN LEFT(d.DocumentExt, 1) = '.' THEN SUBSTRING(d.DocumentExt, 2, LEN(d.DocumentExt))
+                    ELSE d.DocumentExt
+                END,
+                ml.ClaimedContentType = d.ContentType,
+                ml.SourceFileSize = d.FileSize,
+                ml.SourceRecordDate = d.RecordDate,
+                ml.Status = {(int)MigrationStatus.Pending}
+            FROM [migration].[MigrationLog] ml
+            INNER JOIN [dbo].[{documentsTable}] d
+                ON ml.SourceDocumentId = d.ContentId
+            WHERE ml.SourceYear = @Year
+                AND ml.Status = {(int)MigrationStatus.Seeded}
+                AND d.DelStatus = 0";
+
+        var enrichedCount = await migrationContext.Database.ExecuteSqlRawAsync(
+            enrichSql,
+            new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year),
+            ct);
+
+        _logger.LogInformation("Enriched {Count} entries with metadata", enrichedCount);
+
+        // Mark remaining seeded entries (no matching metadata) as skipped
+        var skipSql = $@"
+            UPDATE [migration].[MigrationLog]
+            SET
+                Status = {(int)MigrationStatus.Skipped},
+                ErrorMessage = 'No metadata found in source database (no Documents.ContentId match)',
+                ProcessedAtUtc = GETUTCDATE()
+            WHERE SourceYear = @Year
+                AND Status = {(int)MigrationStatus.Seeded}";
+
+        var skippedCount = await migrationContext.Database.ExecuteSqlRawAsync(
+            skipSql,
+            new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year),
+            ct);
+
+        if (skippedCount > 0)
         {
-            // Fetch batch of seeded entries
-            var seededEntries = await migrationContext.MigrationLog
-                .Where(l => l.SourceYear == _options.Year && l.Status == MigrationStatus.Seeded)
-                .OrderBy(l => l.SourceDocumentId)
-                .Take(_options.BatchSize)
-                .ToListAsync(ct);
-
-            if (seededEntries.Count == 0)
-                break;
-
-            // Get ContentIds for this batch (stored in SourceDocumentId)
-            var contentIds = seededEntries.Select(e => e.SourceDocumentId).ToList();
-
-            // Fetch metadata from source database where Documents.ContentId matches
-            var documents = await sourceRepo.GetDocumentsForContentIdsAsync(contentIds, ct);
-            // Key by ContentId since that's what we're matching
-            var documentsDict = documents.ToDictionary(d => d.ContentId);
-
-            _logger.LogDebug("Fetched metadata for {Found}/{Requested} ContentIds",
-                documents.Count, contentIds.Count);
-
-            // Update entries with metadata
-            foreach (var entry in seededEntries)
-            {
-                if (documentsDict.TryGetValue(entry.SourceDocumentId, out var doc))
-                {
-                    entry.OriginalFilename = doc.DocumentName;
-                    entry.OriginalExtension = doc.DocumentExt?.TrimStart('.');
-                    entry.ClaimedContentType = doc.ContentType;
-                    entry.SourceFileSize = doc.FileSize;
-                    entry.SourceRecordDate = doc.RecordDate;
-                    entry.Status = MigrationStatus.Pending;
-                    enrichedCount++;
-                }
-                else
-                {
-                    // No metadata found - mark as skipped
-                    entry.Status = MigrationStatus.Skipped;
-                    entry.ErrorMessage = "No metadata found in source database (no Documents.ContentId match)";
-                    entry.ProcessedAtUtc = DateTime.UtcNow;
-                    skippedCount++;
-                }
-            }
-
-            await migrationContext.SaveChangesAsync(ct);
-            _logger.LogInformation("Enriched {Enriched} entries, skipped {Skipped}...",
-                enrichedCount, skippedCount);
+            _logger.LogWarning("Skipped {Count} entries with no matching metadata", skippedCount);
         }
 
         _logger.LogInformation("Metadata enrichment complete. Enriched: {Enriched}, Skipped: {Skipped}",
