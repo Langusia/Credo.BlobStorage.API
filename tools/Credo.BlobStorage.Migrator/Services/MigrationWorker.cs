@@ -86,59 +86,20 @@ public class MigrationWorker : BackgroundService
 
     private async Task ApplyMigrationsAsync(CancellationToken ct)
     {
-        _logger.LogInformation("Applying database migrations for schema '{Schema}'...", MigrationDbContext.SchemaName);
+        _logger.LogInformation("Ensuring migration database schema exists...");
 
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-        // First, ensure the schema and table exist using raw SQL (most reliable approach)
-        await EnsureMigrationLogTableExistsAsync(context, ct);
+        // Create schema first (EnsureCreated doesn't handle custom schemas)
+        await context.Database.ExecuteSqlRawAsync(@"
+            IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'migration')
+            EXEC('CREATE SCHEMA [migration]')", ct);
+
+        // EnsureCreated will create tables based on DbContext model if they don't exist
+        await context.Database.EnsureCreatedAsync(ct);
 
         _logger.LogInformation("Database schema ready");
-    }
-
-    private async Task EnsureMigrationLogTableExistsAsync(MigrationDbContext context, CancellationToken ct)
-    {
-        const string createSchemaSql = @"
-            IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'migration')
-            BEGIN
-                EXEC('CREATE SCHEMA [migration]')
-            END";
-
-        const string createTableSql = @"
-            IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[migration].[MigrationLog]') AND type in (N'U'))
-            BEGIN
-                CREATE TABLE [migration].[MigrationLog] (
-                    [Id] int NOT NULL IDENTITY(1,1),
-                    [SourceDocumentId] bigint NOT NULL,
-                    [SourceYear] int NOT NULL,
-                    [OriginalFilename] nvarchar(256) NULL,
-                    [OriginalExtension] nvarchar(10) NULL,
-                    [ClaimedContentType] nvarchar(50) NULL,
-                    [SourceFileSize] int NULL,
-                    [SourceRecordDate] datetime2 NULL,
-                    [Status] int NOT NULL DEFAULT 0,
-                    [TargetDocId] nvarchar(50) NULL,
-                    [TargetBucket] nvarchar(63) NULL,
-                    [TargetFilename] nvarchar(1024) NULL,
-                    [TargetSha256] nvarchar(64) NULL,
-                    [DetectedContentType] nvarchar(255) NULL,
-                    [ErrorMessage] nvarchar(2000) NULL,
-                    [RetryCount] int NOT NULL DEFAULT 0,
-                    [CreatedAtUtc] datetime2 NOT NULL DEFAULT GETUTCDATE(),
-                    [ProcessedAtUtc] datetime2 NULL,
-                    CONSTRAINT [PK_MigrationLog] PRIMARY KEY ([Id])
-                )
-
-                CREATE INDEX [IX_MigrationLog_Status] ON [migration].[MigrationLog] ([Status])
-                CREATE UNIQUE INDEX [UQ_MigrationLog_SourceYear_SourceDocumentId] ON [migration].[MigrationLog] ([SourceYear], [SourceDocumentId])
-            END";
-
-        _logger.LogInformation("Ensuring migration schema exists...");
-        await context.Database.ExecuteSqlRawAsync(createSchemaSql, ct);
-
-        _logger.LogInformation("Ensuring MigrationLog table exists...");
-        await context.Database.ExecuteSqlRawAsync(createTableSql, ct);
     }
 
     private async Task<bool> EnsureBucketExistsAsync(CancellationToken ct)
