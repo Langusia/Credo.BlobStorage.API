@@ -15,6 +15,19 @@ public class FilenameValidatorTests
     [InlineData("simple")]
     [InlineData("123.456")]
     [InlineData("CamelCase.PDF")]
+    [InlineData("მარიამი.jpg")]           // Georgian characters
+    [InlineData("Фото.jpg")]              // Cyrillic characters
+    [InlineData("file name.jpg")]         // Spaces
+    [InlineData("file(1).jpg")]           // Parentheses
+    [InlineData("report (final).pdf")]    // Spaces and parentheses
+    [InlineData("café.txt")]              // Accented characters
+    [InlineData("文档.pdf")]               // Chinese characters
+    [InlineData("file@name.txt")]         // @ symbol
+    [InlineData("file#name.txt")]         // # symbol
+    [InlineData("file$name.txt")]         // $ symbol
+    [InlineData("data;export.csv")]       // Semicolon
+    [InlineData("file^v2.txt")]           // Caret
+    [InlineData("file,backup.txt")]       // Comma
     public void Validate_ValidFilenames_ReturnsSuccess(string filename)
     {
         var result = FilenameValidator.Validate(filename);
@@ -66,18 +79,6 @@ public class FilenameValidatorTests
 
         result.IsValid.Should().BeFalse();
         result.ErrorMessage.Should().Contain("backslash");
-    }
-
-    [Theory]
-    [InlineData("file name.txt")]
-    [InlineData("file@name.txt")]
-    [InlineData("file#name.txt")]
-    [InlineData("file$name.txt")]
-    public void Validate_DisallowedCharacters_ReturnsFail(string filename)
-    {
-        var result = FilenameValidator.Validate(filename);
-
-        result.IsValid.Should().BeFalse();
     }
 
     [Theory]
