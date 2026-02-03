@@ -211,7 +211,7 @@ WHERE ml.SourceYear = @Year
 
         var enrichedCount = await migrationContext.Database.ExecuteSqlRawAsync(
             enrichSql,
-            new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year),
+            new object[] { new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year) },
             ct);
 
         _logger.LogInformation("Enriched {Count} entries with metadata", enrichedCount);
@@ -230,7 +230,7 @@ WHERE SourceYear = @Year
 
         var skippedCount = await migrationContext.Database.ExecuteSqlRawAsync(
             skipSql,
-            new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year),
+            new object[] { new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year) },
             ct);
 
         if (skippedCount > 0)
