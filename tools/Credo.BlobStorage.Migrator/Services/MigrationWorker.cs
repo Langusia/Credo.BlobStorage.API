@@ -109,53 +109,77 @@ public class MigrationWorker : BackgroundService
 
     /// <summary>
     /// Step 3: Seed ContentIds from content database (Documents_2017.DocumentsContent.Id).
-    /// Only inserts IDs with Status=Seeded, no metadata yet.
+    /// Uses batched approach with resume support via max ID tracking.
     /// SourceDocumentId field stores the ContentId (DocumentsContent.Id).
     /// </summary>
     private async Task SeedDocumentIdsAsync(CancellationToken ct)
     {
         _logger.LogInformation("=== Step 3: Seeding ContentIds from content database ===");
+        _logger.LogInformation("Seed batch size: {SeedBatchSize}", _options.SeedBatchSize);
 
-        using var scope = _serviceProvider.CreateScope();
-        var sourceRepo = scope.ServiceProvider.GetRequiredService<ISourceRepository>();
-        var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
-
-        // Get ContentIds (DocumentsContent.Id) from the year-specific database
-        _logger.LogInformation("Fetching ContentIds from {ContentTable}...", _options.ContentTable);
-        var contentIds = await sourceRepo.GetContentIdsAsync(ct);
-        _logger.LogInformation("Found {Count} unique ContentIds with content", contentIds.Count);
-
-        // Get existing ContentIds from migration log (already seeded)
-        var existingIds = await migrationContext.MigrationLog
-            .Where(l => l.SourceYear == _options.Year)
-            .Select(l => l.SourceDocumentId)
-            .ToHashSetAsync(ct);
-
-        _logger.LogInformation("Found {Count} entries already in migration log", existingIds.Count);
-
-        // Filter out already seeded
-        var newContentIds = contentIds.Except(existingIds).ToList();
-        _logger.LogInformation("Found {Count} new ContentIds to seed", newContentIds.Count);
-
-        if (newContentIds.Count == 0)
+        // Get the max SourceDocumentId already seeded for this year (resume point)
+        long lastSeededId;
+        using (var scope = _serviceProvider.CreateScope())
         {
-            _logger.LogInformation("No new ContentIds to seed");
-            return;
+            var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
+            lastSeededId = await migrationContext.MigrationLog
+                .Where(l => l.SourceYear == _options.Year)
+                .Select(l => l.SourceDocumentId)
+                .DefaultIfEmpty(0)
+                .MaxAsync(ct);
         }
 
-        // Seed all IDs at once - EF Core batches internally
-        var entries = newContentIds.Select(contentId => new MigrationLogEntry
+        if (lastSeededId > 0)
         {
-            SourceDocumentId = contentId,
-            SourceYear = _options.Year,
-            Status = MigrationStatus.Seeded,
-            CreatedAtUtc = DateTime.UtcNow
-        }).ToList();
+            _logger.LogInformation("Resuming seeding from SourceDocumentId > {LastId}", lastSeededId);
+        }
 
-        await migrationContext.MigrationLog.AddRangeAsync(entries, ct);
-        await migrationContext.SaveChangesAsync(ct);
+        var totalSeeded = 0;
+        var batchNumber = 0;
 
-        _logger.LogInformation("Seed phase complete. Added {Count} new ContentIds to migration log", entries.Count);
+        while (!ct.IsCancellationRequested)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var sourceRepo = scope.ServiceProvider.GetRequiredService<ISourceRepository>();
+            var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
+
+            // Fetch next batch of ContentIds from content database
+            var contentIdsBatch = await sourceRepo.GetContentIdsBatchAsync(
+                lastSeededId,
+                _options.SeedBatchSize,
+                ct);
+
+            if (contentIdsBatch.Count == 0)
+            {
+                _logger.LogInformation("No more ContentIds to seed");
+                break;
+            }
+
+            batchNumber++;
+
+            // Create entries for this batch
+            var entries = contentIdsBatch.Select(contentId => new MigrationLogEntry
+            {
+                SourceDocumentId = contentId,
+                SourceYear = _options.Year,
+                Status = MigrationStatus.Seeded,
+                CreatedAtUtc = DateTime.UtcNow
+            }).ToList();
+
+            await migrationContext.MigrationLog.AddRangeAsync(entries, ct);
+            await migrationContext.SaveChangesAsync(ct);
+
+            // Update resume point
+            lastSeededId = contentIdsBatch.Max();
+            totalSeeded += entries.Count;
+
+            _logger.LogInformation(
+                "Batch {BatchNum}: Seeded {Count} IDs (last: {LastId}, total: {Total})",
+                batchNumber, entries.Count, lastSeededId, totalSeeded);
+        }
+
+        _logger.LogInformation("Seed phase complete. Total seeded: {Total} IDs in {Batches} batches",
+            totalSeeded, batchNumber);
     }
 
     /// <summary>

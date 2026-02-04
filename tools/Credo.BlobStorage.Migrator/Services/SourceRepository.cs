@@ -85,4 +85,16 @@ public class SourceRepository : ISourceRepository
             yield return id;
         }
     }
+
+    /// <inheritdoc />
+    public async Task<List<long>> GetContentIdsBatchAsync(long startAfterId, int batchSize, CancellationToken ct = default)
+    {
+        return await _contentContext.DocumentContents
+            .AsNoTracking()
+            .Where(c => c.Id > startAfterId && c.Documents != null)
+            .OrderBy(c => c.Id)
+            .Select(c => c.Id)
+            .Take(batchSize)
+            .ToListAsync(ct);
+    }
 }

@@ -45,7 +45,12 @@ public class MigrationOptions
     public string TargetBucket { get; set; } = "default";
 
     /// <summary>
-    /// Number of documents to process per batch.
+    /// Number of IDs to seed per batch during the seeding phase.
+    /// </summary>
+    public int SeedBatchSize { get; set; } = 10000;
+
+    /// <summary>
+    /// Number of documents to process per batch during migration.
     /// </summary>
     public int BatchSize { get; set; } = 100;
 
