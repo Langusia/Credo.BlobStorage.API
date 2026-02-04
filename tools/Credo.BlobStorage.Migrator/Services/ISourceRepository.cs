@@ -37,4 +37,14 @@ public interface ISourceRepository
     /// Streams Id values from DocumentsContent table.
     /// </summary>
     IAsyncEnumerable<long> StreamContentIdsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets a batch of ContentIds starting after a specific ID.
+    /// Used for resumable batched seeding.
+    /// </summary>
+    /// <param name="startAfterId">Only return IDs greater than this value (0 for start)</param>
+    /// <param name="batchSize">Maximum number of IDs to return</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>List of ContentIds ordered by Id</returns>
+    Task<List<long>> GetContentIdsBatchAsync(long startAfterId, int batchSize, CancellationToken ct = default);
 }

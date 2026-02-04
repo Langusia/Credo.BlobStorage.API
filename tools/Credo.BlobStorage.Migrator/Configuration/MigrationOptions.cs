@@ -45,7 +45,12 @@ public class MigrationOptions
     public string TargetBucket { get; set; } = "default";
 
     /// <summary>
-    /// Number of documents to process per batch.
+    /// Number of IDs to seed per batch during the seeding phase.
+    /// </summary>
+    public int SeedBatchSize { get; set; } = 10000;
+
+    /// <summary>
+    /// Number of documents to process per batch during migration.
     /// </summary>
     public int BatchSize { get; set; } = 100;
 
@@ -58,4 +63,10 @@ public class MigrationOptions
     /// Maximum retry attempts for failed uploads.
     /// </summary>
     public int MaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Skip seed and enrich steps (steps 3-4). Use when data is prepared manually via SQL.
+    /// When true, migrator goes straight to blob migration (step 5).
+    /// </summary>
+    public bool SkipSeedAndEnrich { get; set; } = false;
 }
