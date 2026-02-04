@@ -54,11 +54,18 @@ public class MigrationWorker : BackgroundService
                 return;
             }
 
-            // Step 3: Seed document IDs from content database
-            await SeedDocumentIdsAsync(stoppingToken);
+            if (_options.SkipSeedAndEnrich)
+            {
+                _logger.LogInformation("SkipSeedAndEnrich=true, skipping steps 3-4 (seed and enrich)");
+            }
+            else
+            {
+                // Step 3: Seed document IDs from content database
+                await SeedDocumentIdsAsync(stoppingToken);
 
-            // Step 4: Enrich with metadata from source database
-            await EnrichMetadataAsync(stoppingToken);
+                // Step 4: Enrich with metadata from source database
+                await EnrichMetadataAsync(stoppingToken);
+            }
 
             // Step 5: Migrate documents to API
             await MigrateDocumentsAsync(stoppingToken);
