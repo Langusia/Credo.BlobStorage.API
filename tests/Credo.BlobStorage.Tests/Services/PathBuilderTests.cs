@@ -2,6 +2,7 @@ using Credo.BlobStorage.Api.Configuration;
 using Credo.BlobStorage.Api.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using Xunit;
 
 namespace Credo.BlobStorage.Tests.Services;
 

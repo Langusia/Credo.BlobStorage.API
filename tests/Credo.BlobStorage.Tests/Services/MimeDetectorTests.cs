@@ -1,5 +1,6 @@
 using Credo.BlobStorage.Core.Mime;
 using FluentAssertions;
+using Xunit;
 
 namespace Credo.BlobStorage.Tests.Services;
 

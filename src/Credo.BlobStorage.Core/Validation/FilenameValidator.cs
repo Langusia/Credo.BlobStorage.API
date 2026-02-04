@@ -14,10 +14,6 @@ public static class FilenameValidator
         @"[\x00-\x1F\x7F]",
         RegexOptions.Compiled);
 
-    private static readonly Regex AllowedCharsRegex = new(
-        @"^[a-zA-Z0-9._\-/]+$",
-        RegexOptions.Compiled);
-
     /// <summary>
     /// Validates a filename according to S3 object key naming rules.
     /// </summary>
@@ -53,12 +49,6 @@ public static class FilenameValidator
         if (filename.Contains('\0'))
         {
             return ValidationResult.Fail("Filename must not contain null characters.");
-        }
-
-        // Check allowed characters: a-z A-Z 0-9 . _ - /
-        if (!AllowedCharsRegex.IsMatch(filename))
-        {
-            return ValidationResult.Fail("Filename must contain only alphanumeric characters, dots (.), underscores (_), hyphens (-), and forward slashes (/).");
         }
 
         // Check for leading or trailing slashes

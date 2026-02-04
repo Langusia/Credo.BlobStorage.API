@@ -4,20 +4,33 @@ services:
       context: .
       dockerfile: src/Credo.BlobStorage.Api/Dockerfile
     container_name: blobstorage-api
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Server=your-sql-server;Database=BlobStorage;User Id=your-user;Password=your-password;TrustServerCertificate=True
-      - Storage__RootPath=/mnt/storage
     ports:
       - "5000:8080"
     volumes:
-      - blob-storage:/mnt/storage
+      - /2017:/mnt/storage/2017
+      # Add more years as needed:
+      # - /2020:/mnt/storage/2020
+      # - /2021:/mnt/storage/2021
     networks:
-      - blobstorage-network
+      - blobstorage
+    restart: unless-stopped
 
-volumes:
-  blob-storage:
+  migrator:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    container_name: blobstorage-migrator
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      # Override API URL to use container name
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+    profiles:
+      - migration
 
 networks:
-  blobstorage-network:
-    driver: bridge
+  blobstorage:
