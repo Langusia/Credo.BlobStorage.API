@@ -17,6 +17,4 @@
 *.md
 LICENSE
 .dockerignore
-docker-compose*.yml
-tools/
 tests/

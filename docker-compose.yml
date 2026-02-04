@@ -8,8 +8,11 @@ services:
       - "5000:8080"
     volumes:
       - /2017:/mnt/storage/2017
-      # - /2018:/mnt/storage/2018
-      # - /2019:/mnt/storage/2019
+      # Add more years as needed:
+      # - /2020:/mnt/storage/2020
+      # - /2021:/mnt/storage/2021
+    networks:
+      - blobstorage
     restart: unless-stopped
 
   migrator:
@@ -21,20 +24,13 @@ services:
       - api
     volumes:
       - ./logs:/app/logs
-    # Run once and exit - use "docker compose run migrator" to execute
-    # Or override config via environment variables
+    networks:
+      - blobstorage
+    environment:
+      # Override API URL to use container name
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
     profiles:
       - migration
 
-  migrator:
-    build:
-      context: .
-      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
-    container_name: blobstorage-migrator
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - api
-    # Runs once and exits - start manually with: docker compose run migrator
-    profiles:
-      - tools
+networks:
+  blobstorage:
