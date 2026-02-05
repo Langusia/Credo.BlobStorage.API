@@ -58,4 +58,11 @@ public class MigrationOptions
     /// Maximum retry attempts for failed uploads.
     /// </summary>
     public int MaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Worker token for partitioning work across parallel migrators.
+    /// If set, only processes rows with matching WorkerToken.
+    /// If null, processes all rows (backward compatible).
+    /// </summary>
+    public int? WorkerToken { get; set; }
 }

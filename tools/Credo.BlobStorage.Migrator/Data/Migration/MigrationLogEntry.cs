@@ -94,4 +94,9 @@ public class MigrationLogEntry
     /// When the migration was processed (completed/failed/skipped).
     /// </summary>
     public DateTime? ProcessedAtUtc { get; set; }
+
+    /// <summary>
+    /// Worker token for partitioning work across parallel migrators.
+    /// </summary>
+    public int? WorkerToken { get; set; }
 }

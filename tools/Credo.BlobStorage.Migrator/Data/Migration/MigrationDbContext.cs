@@ -96,6 +96,13 @@ public class MigrationDbContext : DbContext
             // Index on Status for batch queries
             entity.HasIndex(e => e.Status)
                 .HasDatabaseName("IX_MigrationLog_Status");
+
+            // WorkerToken for parallel migrator partitioning
+            entity.Property(e => e.WorkerToken)
+                .IsRequired(false);
+
+            entity.HasIndex(e => e.WorkerToken)
+                .HasDatabaseName("IX_MigrationLog_WorkerToken");
         });
     }
 }
