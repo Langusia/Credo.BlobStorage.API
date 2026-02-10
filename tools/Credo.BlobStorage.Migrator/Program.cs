@@ -37,12 +37,6 @@ try
         .Get<MigrationOptions>()
         ?? throw new InvalidOperationException("Migration configuration is missing");
 
-    // Register Source DbContext (SQL Server - main Documents DB with metadata)
-    builder.Services.AddDbContext<SourceDbContext>(options =>
-    {
-        options.UseSqlServer(migrationOptions.SourceConnectionString);
-    });
-
     // Register Content DbContext (SQL Server - year-specific DB with content, e.g., Documents_2017)
     builder.Services.AddDbContext<ContentDbContext>(options =>
     {

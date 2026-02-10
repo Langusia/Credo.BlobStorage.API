@@ -82,6 +82,8 @@ public class MigrationDbContext : DbContext
             entity.Property(e => e.RetryCount)
                 .HasDefaultValue(0);
 
+            entity.Property(e => e.WorkerToken);
+
             entity.Property(e => e.CreatedAtUtc)
                 .HasDefaultValueSql("GETUTCDATE()")
                 .IsRequired();
@@ -96,6 +98,10 @@ public class MigrationDbContext : DbContext
             // Index on Status for batch queries
             entity.HasIndex(e => e.Status)
                 .HasDatabaseName("IX_MigrationLog_Status");
+
+            // Index on WorkerToken for parallel processing
+            entity.HasIndex(e => e.WorkerToken)
+                .HasDatabaseName("IX_MigrationLog_WorkerToken");
         });
     }
 }

@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using Credo.BlobStorage.Migrator.Configuration;
 using Credo.BlobStorage.Migrator.Data.Migration;
-using Credo.BlobStorage.Migrator.Data.Source;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -11,6 +10,7 @@ namespace Credo.BlobStorage.Migrator.Services;
 
 /// <summary>
 /// Background service that runs the migration process once and exits.
+/// Supports parallel processing via WorkerToken partitioning.
 /// </summary>
 public class MigrationWorker : BackgroundService
 {
@@ -38,7 +38,7 @@ public class MigrationWorker : BackgroundService
         try
         {
             _logger.LogInformation("Starting migration for year {Year}", _options.Year);
-            _logger.LogInformation("Metadata source: {DocumentsTable} (main Documents DB)", _options.DocumentsTable);
+            _logger.LogInformation("Worker token: {WorkerToken}", _options.WorkerToken?.ToString() ?? "ALL");
             _logger.LogInformation("Content source: {ContentTable} (Documents_{Year} DB)", _options.ContentTable, _options.Year);
             _logger.LogInformation("Target bucket: {Bucket}", _options.TargetBucket);
             _logger.LogInformation("Batch size: {BatchSize}, Max parallelism: {MaxParallelism}",
@@ -54,23 +54,10 @@ public class MigrationWorker : BackgroundService
                 return;
             }
 
-            if (_options.SkipSeedAndEnrich)
-            {
-                _logger.LogInformation("SkipSeedAndEnrich=true, skipping steps 3-4 (seed and enrich)");
-            }
-            else
-            {
-                // Step 3: Seed document IDs from content database
-                await SeedDocumentIdsAsync(stoppingToken);
-
-                // Step 4: Enrich with metadata from source database
-                await EnrichMetadataAsync(stoppingToken);
-            }
-
-            // Step 5: Migrate documents to API
+            // Step 3: Migrate documents to API
             await MigrateDocumentsAsync(stoppingToken);
 
-            // Step 6: Report statistics
+            // Step 4: Report statistics
             await ReportStatisticsAsync(stoppingToken);
 
             stopwatch.Stop();
@@ -115,171 +102,13 @@ public class MigrationWorker : BackgroundService
     }
 
     /// <summary>
-    /// Step 3: Seed ContentIds from content database (Documents_2017.DocumentsContent.Id).
-    /// Uses batched approach with resume support via max ID tracking.
-    /// SourceDocumentId field stores the ContentId (DocumentsContent.Id).
-    /// </summary>
-    private async Task SeedDocumentIdsAsync(CancellationToken ct)
-    {
-        _logger.LogInformation("=== Step 3: Seeding ContentIds from content database ===");
-        _logger.LogInformation("Seed batch size: {SeedBatchSize}", _options.SeedBatchSize);
-
-        // Get the max SourceDocumentId already seeded for this year (resume point)
-        long lastSeededId;
-        using (var scope = _serviceProvider.CreateScope())
-        {
-            var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
-            lastSeededId = await migrationContext.MigrationLog
-                .Where(l => l.SourceYear == _options.Year)
-                .Select(l => l.SourceDocumentId)
-                .DefaultIfEmpty(0)
-                .MaxAsync(ct);
-        }
-
-        if (lastSeededId > 0)
-        {
-            _logger.LogInformation("Resuming seeding from SourceDocumentId > {LastId}", lastSeededId);
-        }
-
-        var totalSeeded = 0;
-        var batchNumber = 0;
-
-        while (!ct.IsCancellationRequested)
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var sourceRepo = scope.ServiceProvider.GetRequiredService<ISourceRepository>();
-            var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
-
-            // Fetch next batch of ContentIds from content database
-            var contentIdsBatch = await sourceRepo.GetContentIdsBatchAsync(
-                lastSeededId,
-                _options.SeedBatchSize,
-                ct);
-
-            if (contentIdsBatch.Count == 0)
-            {
-                _logger.LogInformation("No more ContentIds to seed");
-                break;
-            }
-
-            batchNumber++;
-
-            // Create entries for this batch
-            var entries = contentIdsBatch.Select(contentId => new MigrationLogEntry
-            {
-                SourceDocumentId = contentId,
-                SourceYear = _options.Year,
-                Status = MigrationStatus.Seeded,
-                CreatedAtUtc = DateTime.UtcNow
-            }).ToList();
-
-            await migrationContext.MigrationLog.AddRangeAsync(entries, ct);
-            await migrationContext.SaveChangesAsync(ct);
-
-            // Update resume point
-            lastSeededId = contentIdsBatch.Max();
-            totalSeeded += entries.Count;
-
-            _logger.LogInformation(
-                "Batch {BatchNum}: Seeded {Count} IDs (last: {LastId}, total: {Total})",
-                batchNumber, entries.Count, lastSeededId, totalSeeded);
-        }
-
-        _logger.LogInformation("Seed phase complete. Total seeded: {Total} IDs in {Batches} batches",
-            totalSeeded, batchNumber);
-    }
-
-    /// <summary>
-    /// Step 4: Enrich seeded entries with metadata from Documents table.
-    /// Uses raw SQL UPDATE with JOIN for efficiency (same database).
-    /// Matches Documents.ContentId = seeded ContentId (stored in SourceDocumentId).
-    /// Updates entries from Status=Seeded to Status=Pending.
-    /// </summary>
-    private async Task EnrichMetadataAsync(CancellationToken ct)
-    {
-        _logger.LogInformation("=== Step 4: Enriching with metadata from Documents table ===");
-
-        using var scope = _serviceProvider.CreateScope();
-        var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
-
-        // Get count of entries that need metadata enrichment
-        var seededCount = await migrationContext.MigrationLog
-            .Where(l => l.SourceYear == _options.Year && l.Status == MigrationStatus.Seeded)
-            .CountAsync(ct);
-
-        _logger.LogInformation("Found {Count} entries awaiting metadata enrichment", seededCount);
-
-        if (seededCount == 0)
-        {
-            _logger.LogInformation("No entries need metadata enrichment");
-            return;
-        }
-
-        var documentsTable = _options.DocumentsTable;
-
-        // Build and execute enrichment SQL
-        var enrichSql = $@"
-UPDATE ml
-SET
-    ml.OriginalFilename = d.DocumentName,
-    ml.OriginalExtension = CASE
-        WHEN d.DocumentExt IS NULL THEN NULL
-        WHEN LEFT(d.DocumentExt, 1) = '.' THEN SUBSTRING(d.DocumentExt, 2, LEN(d.DocumentExt))
-        ELSE d.DocumentExt
-    END,
-    ml.ClaimedContentType = d.ContentType,
-    ml.SourceFileSize = d.FileSize,
-    ml.SourceRecordDate = d.RecordDate,
-    ml.Status = {(int)MigrationStatus.Pending}
-FROM [migration].[MigrationLog] ml
-INNER JOIN [dbo].[{documentsTable}] d
-    ON ml.SourceDocumentId = d.ContentId
-WHERE ml.SourceYear = @Year
-    AND ml.Status = {(int)MigrationStatus.Seeded}
-    AND d.DelStatus = 0";
-
-        _logger.LogInformation("Executing enrichment SQL:\n{Sql}", enrichSql);
-
-        var enrichedCount = await migrationContext.Database.ExecuteSqlRawAsync(
-            enrichSql,
-            new object[] { new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year) },
-            ct);
-
-        _logger.LogInformation("Enriched {Count} entries with metadata", enrichedCount);
-
-        // Mark remaining seeded entries (no matching metadata) as skipped
-        var skipSql = $@"
-UPDATE [migration].[MigrationLog]
-SET
-    Status = {(int)MigrationStatus.Skipped},
-    ErrorMessage = 'No metadata found in source database (no Documents.ContentId match)',
-    ProcessedAtUtc = GETUTCDATE()
-WHERE SourceYear = @Year
-    AND Status = {(int)MigrationStatus.Seeded}";
-
-        _logger.LogInformation("Executing skip SQL:\n{Sql}", skipSql);
-
-        var skippedCount = await migrationContext.Database.ExecuteSqlRawAsync(
-            skipSql,
-            new object[] { new Microsoft.Data.SqlClient.SqlParameter("@Year", _options.Year) },
-            ct);
-
-        if (skippedCount > 0)
-        {
-            _logger.LogWarning("Skipped {Count} entries with no matching metadata", skippedCount);
-        }
-
-        _logger.LogInformation("Metadata enrichment complete. Enriched: {Enriched}, Skipped: {Skipped}",
-            enrichedCount, skippedCount);
-    }
-
-    /// <summary>
-    /// Step 5: Migrate documents to API.
+    /// Step 3: Migrate documents to API.
     /// Fetches blob from content database and uploads to BlobStorage API.
+    /// Filters by WorkerToken when set for parallel processing.
     /// </summary>
     private async Task MigrateDocumentsAsync(CancellationToken ct)
     {
-        _logger.LogInformation("=== Step 5: Migrating documents to API ===");
+        _logger.LogInformation("=== Step 3: Migrating documents to API ===");
 
         using var semaphore = new SemaphoreSlim(_options.MaxParallelism);
         var processedCount = 0;
@@ -292,11 +121,18 @@ WHERE SourceYear = @Year
             using var scope = _serviceProvider.CreateScope();
             var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-            // Fetch pending batch (only entries with metadata - Status=Pending)
-            var pendingEntries = await migrationContext.MigrationLog
+            // Build query with optional WorkerToken filter
+            var query = migrationContext.MigrationLog
                 .Where(l => l.SourceYear == _options.Year &&
                            (l.Status == MigrationStatus.Pending ||
-                            (l.Status == MigrationStatus.Failed && l.RetryCount < _options.MaxRetries)))
+                            (l.Status == MigrationStatus.Failed && l.RetryCount < _options.MaxRetries)));
+
+            if (_options.WorkerToken.HasValue)
+            {
+                query = query.Where(l => l.WorkerToken == _options.WorkerToken);
+            }
+
+            var pendingEntries = await query
                 .OrderBy(l => l.SourceDocumentId)
                 .Take(_options.BatchSize)
                 .ToListAsync(ct);
@@ -460,22 +296,33 @@ WHERE SourceYear = @Year
         using var scope = _serviceProvider.CreateScope();
         var migrationContext = scope.ServiceProvider.GetRequiredService<MigrationDbContext>();
 
-        var stats = await migrationContext.MigrationLog
-            .Where(l => l.SourceYear == _options.Year)
+        // Build base query with optional WorkerToken filter
+        var baseQuery = migrationContext.MigrationLog
+            .Where(l => l.SourceYear == _options.Year);
+
+        if (_options.WorkerToken.HasValue)
+        {
+            baseQuery = baseQuery.Where(l => l.WorkerToken == _options.WorkerToken);
+        }
+
+        var stats = await baseQuery
             .GroupBy(l => l.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
-        _logger.LogInformation("=== Migration Statistics for Year {Year} ===", _options.Year);
+        var workerLabel = _options.WorkerToken.HasValue
+            ? $"Year {_options.Year}, WorkerToken {_options.WorkerToken}"
+            : $"Year {_options.Year}";
+
+        _logger.LogInformation("=== Migration Statistics for {Label} ===", workerLabel);
 
         foreach (var stat in stats.OrderBy(s => s.Status))
         {
             _logger.LogInformation("  {Status}: {Count}", stat.Status, stat.Count);
         }
 
-        var failedWithMaxRetries = await migrationContext.MigrationLog
-            .CountAsync(l => l.SourceYear == _options.Year &&
-                            l.Status == MigrationStatus.Failed &&
+        var failedWithMaxRetries = await baseQuery
+            .CountAsync(l => l.Status == MigrationStatus.Failed &&
                             l.RetryCount >= _options.MaxRetries, ct);
 
         if (failedWithMaxRetries > 0)
