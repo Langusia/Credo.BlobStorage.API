@@ -9,7 +9,7 @@ public class MigrationOptions
 
     /// <summary>
     /// SQL Server connection string for the source metadata database (main Documents DB).
-    /// Contains Documents_{Year} tables with document metadata.
+    /// Contains MigrationLog table in migration schema.
     /// </summary>
     public string SourceConnectionString { get; set; } = string.Empty;
 
@@ -25,14 +25,9 @@ public class MigrationOptions
     public string TargetApiBaseUrl { get; set; } = "http://localhost:5000";
 
     /// <summary>
-    /// Year being migrated (used for table names and DocId generation).
+    /// Year being migrated (used for DocId generation).
     /// </summary>
     public int Year { get; set; }
-
-    /// <summary>
-    /// Name of the source documents table in the metadata database (e.g., "Documents_2017").
-    /// </summary>
-    public string DocumentsTable { get; set; } = string.Empty;
 
     /// <summary>
     /// Name of the source content table in the content database (e.g., "DocumentsContent").
@@ -43,11 +38,6 @@ public class MigrationOptions
     /// Target bucket name in the BlobStorage API.
     /// </summary>
     public string TargetBucket { get; set; } = "default";
-
-    /// <summary>
-    /// Number of IDs to seed per batch during the seeding phase.
-    /// </summary>
-    public int SeedBatchSize { get; set; } = 10000;
 
     /// <summary>
     /// Number of documents to process per batch during migration.
@@ -65,8 +55,9 @@ public class MigrationOptions
     public int MaxRetries { get; set; } = 3;
 
     /// <summary>
-    /// Skip seed and enrich steps (steps 3-4). Use when data is prepared manually via SQL.
-    /// When true, migrator goes straight to blob migration (step 5).
+    /// Worker token for parallel processing partitioning.
+    /// When set, only processes records with matching WorkerToken value.
+    /// When null, processes all records (no filtering).
     /// </summary>
-    public bool SkipSeedAndEnrich { get; set; } = false;
+    public int? WorkerToken { get; set; }
 }

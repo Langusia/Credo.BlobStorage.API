@@ -86,6 +86,11 @@ public class MigrationLogEntry
     public int RetryCount { get; set; }
 
     /// <summary>
+    /// Worker token for parallel processing partitioning.
+    /// </summary>
+    public int? WorkerToken { get; set; }
+
+    /// <summary>
     /// When the log entry was created.
     /// </summary>
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
