@@ -10,31 +10,40 @@ public partial class AddContentIdDocumentId : Microsoft.EntityFrameworkCore.Migr
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.AddColumn<long>(
-            name: "ContentId",
-            schema: "migration",
-            table: "MigrationLog",
-            type: "bigint",
-            nullable: true);
+        // Idempotent: columns/indexes may already exist if added via manual script
+        migrationBuilder.Sql("""
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID('[migration].[MigrationLog]') AND name = 'ContentId'
+            )
+            ALTER TABLE [migration].[MigrationLog] ADD [ContentId] BIGINT NULL;
+            """);
 
-        migrationBuilder.AddColumn<long>(
-            name: "DocumentId",
-            schema: "migration",
-            table: "MigrationLog",
-            type: "bigint",
-            nullable: true);
+        migrationBuilder.Sql("""
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID('[migration].[MigrationLog]') AND name = 'DocumentId'
+            )
+            ALTER TABLE [migration].[MigrationLog] ADD [DocumentId] BIGINT NULL;
+            """);
 
-        migrationBuilder.CreateIndex(
-            name: "IX_MigrationLog_SourceYear_ContentId",
-            schema: "migration",
-            table: "MigrationLog",
-            columns: new[] { "SourceYear", "ContentId" });
+        migrationBuilder.Sql("""
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.indexes
+                WHERE object_id = OBJECT_ID('[migration].[MigrationLog]') AND name = 'IX_MigrationLog_SourceYear_ContentId'
+            )
+            CREATE INDEX [IX_MigrationLog_SourceYear_ContentId]
+                ON [migration].[MigrationLog] ([SourceYear], [ContentId]);
+            """);
 
-        migrationBuilder.CreateIndex(
-            name: "IX_MigrationLog_SourceYear_DocumentId",
-            schema: "migration",
-            table: "MigrationLog",
-            columns: new[] { "SourceYear", "DocumentId" });
+        migrationBuilder.Sql("""
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.indexes
+                WHERE object_id = OBJECT_ID('[migration].[MigrationLog]') AND name = 'IX_MigrationLog_SourceYear_DocumentId'
+            )
+            CREATE INDEX [IX_MigrationLog_SourceYear_DocumentId]
+                ON [migration].[MigrationLog] ([SourceYear], [DocumentId]);
+            """);
     }
 
     /// <inheritdoc />
