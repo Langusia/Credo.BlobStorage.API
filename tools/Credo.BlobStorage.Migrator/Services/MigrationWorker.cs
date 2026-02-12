@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Credo.BlobStorage.Core.Validation;
 using Credo.BlobStorage.Migrator.Configuration;
 using Credo.BlobStorage.Migrator.Data.Migration;
 using Microsoft.EntityFrameworkCore;
@@ -245,6 +246,9 @@ public class MigrationWorker : BackgroundService
                 finalFilename = baseFilename;
             }
 
+            // Sanitize filename if it contains invalid characters
+            finalFilename = SanitizeFilename(finalFilename, entry.SourceDocumentId, entry.OriginalExtension);
+
             var targetFilename = $"{entry.SourceDocumentId}/{finalFilename}";
 
             // Upload to API
@@ -317,6 +321,30 @@ public class MigrationWorker : BackgroundService
 
             return MigrationStatus.Failed;
         }
+    }
+
+    private string SanitizeFilename(string original, long sourceDocumentId, string? extension)
+    {
+        // Try original first
+        if (FilenameValidator.Validate(original).IsValid)
+            return original;
+
+        // Replace control chars and backslashes with underscore
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(original, @"[\x00-\x1F\x7F\\]", "_");
+
+        // Remove leading/trailing slashes
+        sanitized = sanitized.Trim('/');
+
+        // Replace consecutive slashes
+        while (sanitized.Contains("//"))
+            sanitized = sanitized.Replace("//", "/");
+
+        if (FilenameValidator.Validate(sanitized).IsValid)
+            return sanitized;
+
+        // Fallback to ID-based name
+        var ext = string.IsNullOrEmpty(extension) ? "bin" : extension.TrimStart('.');
+        return $"{sourceDocumentId}.{ext}";
     }
 
     private async Task ReportStatisticsAsync(CancellationToken ct)
