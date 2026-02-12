@@ -10,40 +10,8 @@ public partial class AddContentIdDocumentId : Microsoft.EntityFrameworkCore.Migr
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        // Idempotent: columns/indexes may already exist if added via manual script
-        migrationBuilder.Sql("""
-            IF NOT EXISTS (
-                SELECT 1 FROM sys.columns
-                WHERE object_id = OBJECT_ID('[migration].[MigrationLog]') AND name = 'ContentId'
-            )
-            ALTER TABLE [migration].[MigrationLog] ADD [ContentId] BIGINT NULL;
-            """);
-
-        migrationBuilder.Sql("""
-            IF NOT EXISTS (
-                SELECT 1 FROM sys.columns
-                WHERE object_id = OBJECT_ID('[migration].[MigrationLog]') AND name = 'DocumentId'
-            )
-            ALTER TABLE [migration].[MigrationLog] ADD [DocumentId] BIGINT NULL;
-            """);
-
-        migrationBuilder.Sql("""
-            IF NOT EXISTS (
-                SELECT 1 FROM sys.indexes
-                WHERE object_id = OBJECT_ID('[migration].[MigrationLog]') AND name = 'IX_MigrationLog_SourceYear_ContentId'
-            )
-            CREATE INDEX [IX_MigrationLog_SourceYear_ContentId]
-                ON [migration].[MigrationLog] ([SourceYear], [ContentId]);
-            """);
-
-        migrationBuilder.Sql("""
-            IF NOT EXISTS (
-                SELECT 1 FROM sys.indexes
-                WHERE object_id = OBJECT_ID('[migration].[MigrationLog]') AND name = 'IX_MigrationLog_SourceYear_DocumentId'
-            )
-            CREATE INDEX [IX_MigrationLog_SourceYear_DocumentId]
-                ON [migration].[MigrationLog] ([SourceYear], [DocumentId]);
-            """);
+        // No-op: ContentId, DocumentId columns and indexes were added via manual SQL script.
+        // This migration exists to keep EF model snapshot in sync with the database.
     }
 
     /// <inheritdoc />
