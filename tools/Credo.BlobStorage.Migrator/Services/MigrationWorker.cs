@@ -19,6 +19,7 @@ public class MigrationWorker : BackgroundService
     private readonly MigrationOptions _options;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<MigrationWorker> _logger;
+    private bool _hasFailures;
 
     public MigrationWorker(
         IServiceProvider serviceProvider,
@@ -63,6 +64,8 @@ public class MigrationWorker : BackgroundService
 
             stopwatch.Stop();
             _logger.LogInformation("Migration completed in {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+
+            Environment.ExitCode = _hasFailures ? 1 : 0;
         }
         catch (OperationCanceledException)
         {
@@ -71,6 +74,7 @@ public class MigrationWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Migration failed with error");
+            Environment.ExitCode = 1;
         }
         finally
         {
@@ -213,6 +217,33 @@ public class MigrationWorker : BackgroundService
                 await migrationContext.SaveChangesAsync(ct);
 
                 return MigrationStatus.Skipped;
+            }
+
+            // Before uploading, check if blob already uploaded for this ContentId+Year
+            if (entry.ContentId.HasValue)
+            {
+                var alreadyCompleted = await migrationContext.MigrationLog
+                    .FirstOrDefaultAsync(l => l.ContentId == entry.ContentId &&
+                                              l.SourceYear == _options.Year &&
+                                              l.Status == MigrationStatus.Completed, ct);
+
+                if (alreadyCompleted != null)
+                {
+                    // Blob already uploaded - copy reference instead of re-uploading
+                    trackedEntry.Status = MigrationStatus.Completed;
+                    trackedEntry.TargetDocId = alreadyCompleted.TargetDocId;
+                    trackedEntry.TargetBucket = alreadyCompleted.TargetBucket;
+                    trackedEntry.TargetFilename = alreadyCompleted.TargetFilename;
+                    trackedEntry.TargetSha256 = alreadyCompleted.TargetSha256;
+                    trackedEntry.DetectedContentType = alreadyCompleted.DetectedContentType;
+                    trackedEntry.ProcessedAtUtc = DateTime.UtcNow;
+                    await migrationContext.SaveChangesAsync(ct);
+
+                    _logger.LogDebug("ContentId {ContentId} already uploaded as {DocId}, linked DocumentId {DocumentId}",
+                        entry.ContentId, alreadyCompleted.TargetDocId, entry.DocumentId);
+
+                    return MigrationStatus.Completed;
+                }
             }
 
             // Build target filename: {SourceDocumentId}/{OriginalName}.{ext}
@@ -383,6 +414,7 @@ public class MigrationWorker : BackgroundService
 
         if (failedWithMaxRetries > 0)
         {
+            _hasFailures = true;
             _logger.LogWarning("  {Count} documents failed after {MaxRetries} retries",
                 failedWithMaxRetries, _options.MaxRetries);
         }
