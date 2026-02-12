@@ -13,7 +13,7 @@ services:
       - blobstorage
     restart: unless-stopped
 
-  migrator:
+  migrator-0:
     build:
       context: .
       dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
@@ -25,6 +25,24 @@ services:
       - blobstorage
     environment:
       - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__WorkerToken=0
+    restart: on-failure
+    profiles:
+      - migration
+
+  migrator-1:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__WorkerToken=1
     restart: on-failure
     profiles:
       - migration
