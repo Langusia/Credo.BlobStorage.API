@@ -82,6 +82,10 @@ public class MigrationDbContext : DbContext
             entity.Property(e => e.RetryCount)
                 .HasDefaultValue(0);
 
+            entity.Property(e => e.ContentId);
+
+            entity.Property(e => e.DocumentId);
+
             entity.Property(e => e.WorkerToken);
 
             entity.Property(e => e.CreatedAtUtc)
@@ -102,6 +106,14 @@ public class MigrationDbContext : DbContext
             // Index on WorkerToken for parallel processing
             entity.HasIndex(e => e.WorkerToken)
                 .HasDatabaseName("IX_MigrationLog_WorkerToken");
+
+            // Index on (SourceYear, ContentId) for deduplication lookups
+            entity.HasIndex(e => new { e.SourceYear, e.ContentId })
+                .HasDatabaseName("IX_MigrationLog_SourceYear_ContentId");
+
+            // Index on (SourceYear, DocumentId) for document lookups
+            entity.HasIndex(e => new { e.SourceYear, e.DocumentId })
+                .HasDatabaseName("IX_MigrationLog_SourceYear_DocumentId");
         });
     }
 }

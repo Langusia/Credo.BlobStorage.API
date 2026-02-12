@@ -86,6 +86,17 @@ public class MigrationLogEntry
     public int RetryCount { get; set; }
 
     /// <summary>
+    /// Content/blob identifier for deduplication. Same ContentId when Documents share content.
+    /// NOT globally unique — must always be scoped by SourceYear.
+    /// </summary>
+    public long? ContentId { get; set; }
+
+    /// <summary>
+    /// Legacy system document reference (unique per Document record).
+    /// </summary>
+    public long? DocumentId { get; set; }
+
+    /// <summary>
     /// Worker token for parallel processing partitioning.
     /// </summary>
     public int? WorkerToken { get; set; }

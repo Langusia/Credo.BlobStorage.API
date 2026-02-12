@@ -22,6 +22,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Credo.BlobStorage.Core\Credo.BlobStorage.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="..\..\.dockerignore">
       <Link>.dockerignore</Link>
     </Content>

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Credo.BlobStorage.Core.Validation;
 using Credo.BlobStorage.Migrator.Configuration;
 using Credo.BlobStorage.Migrator.Data.Migration;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,7 @@ public class MigrationWorker : BackgroundService
     private readonly MigrationOptions _options;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<MigrationWorker> _logger;
+    private bool _hasFailures;
 
     public MigrationWorker(
         IServiceProvider serviceProvider,
@@ -62,6 +64,8 @@ public class MigrationWorker : BackgroundService
 
             stopwatch.Stop();
             _logger.LogInformation("Migration completed in {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+
+            Environment.ExitCode = _hasFailures ? 1 : 0;
         }
         catch (OperationCanceledException)
         {
@@ -70,6 +74,7 @@ public class MigrationWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Migration failed with error");
+            Environment.ExitCode = 1;
         }
         finally
         {
@@ -214,6 +219,33 @@ public class MigrationWorker : BackgroundService
                 return MigrationStatus.Skipped;
             }
 
+            // Before uploading, check if blob already uploaded for this ContentId+Year
+            if (entry.ContentId.HasValue)
+            {
+                var alreadyCompleted = await migrationContext.MigrationLog
+                    .FirstOrDefaultAsync(l => l.ContentId == entry.ContentId &&
+                                              l.SourceYear == _options.Year &&
+                                              l.Status == MigrationStatus.Completed, ct);
+
+                if (alreadyCompleted != null)
+                {
+                    // Blob already uploaded - copy reference instead of re-uploading
+                    trackedEntry.Status = MigrationStatus.Completed;
+                    trackedEntry.TargetDocId = alreadyCompleted.TargetDocId;
+                    trackedEntry.TargetBucket = alreadyCompleted.TargetBucket;
+                    trackedEntry.TargetFilename = alreadyCompleted.TargetFilename;
+                    trackedEntry.TargetSha256 = alreadyCompleted.TargetSha256;
+                    trackedEntry.DetectedContentType = alreadyCompleted.DetectedContentType;
+                    trackedEntry.ProcessedAtUtc = DateTime.UtcNow;
+                    await migrationContext.SaveChangesAsync(ct);
+
+                    _logger.LogDebug("ContentId {ContentId} already uploaded as {DocId}, linked DocumentId {DocumentId}",
+                        entry.ContentId, alreadyCompleted.TargetDocId, entry.DocumentId);
+
+                    return MigrationStatus.Completed;
+                }
+            }
+
             // Build target filename: {SourceDocumentId}/{OriginalName}.{ext}
             // Handle extensions properly to avoid duplicates like "IMG_0699.JPG.JPG"
             var baseFilename = entry.OriginalFilename ?? entry.SourceDocumentId.ToString();
@@ -244,6 +276,9 @@ public class MigrationWorker : BackgroundService
                 // No detected extension → keep filename as-is
                 finalFilename = baseFilename;
             }
+
+            // Sanitize filename if it contains invalid characters
+            finalFilename = SanitizeFilename(finalFilename, entry.SourceDocumentId, entry.OriginalExtension);
 
             var targetFilename = $"{entry.SourceDocumentId}/{finalFilename}";
 
@@ -319,6 +354,30 @@ public class MigrationWorker : BackgroundService
         }
     }
 
+    private string SanitizeFilename(string original, long sourceDocumentId, string? extension)
+    {
+        // Try original first
+        if (FilenameValidator.Validate(original).IsValid)
+            return original;
+
+        // Replace control chars and backslashes with underscore
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(original, @"[\x00-\x1F\x7F\\]", "_");
+
+        // Remove leading/trailing slashes
+        sanitized = sanitized.Trim('/');
+
+        // Replace consecutive slashes
+        while (sanitized.Contains("//"))
+            sanitized = sanitized.Replace("//", "/");
+
+        if (FilenameValidator.Validate(sanitized).IsValid)
+            return sanitized;
+
+        // Fallback to ID-based name
+        var ext = string.IsNullOrEmpty(extension) ? "bin" : extension.TrimStart('.');
+        return $"{sourceDocumentId}.{ext}";
+    }
+
     private async Task ReportStatisticsAsync(CancellationToken ct)
     {
         using var scope = _serviceProvider.CreateScope();
@@ -355,6 +414,7 @@ public class MigrationWorker : BackgroundService
 
         if (failedWithMaxRetries > 0)
         {
+            _hasFailures = true;
             _logger.LogWarning("  {Count} documents failed after {MaxRetries} retries",
                 failedWithMaxRetries, _options.MaxRetries);
         }
