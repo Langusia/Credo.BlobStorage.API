@@ -10,18 +10,8 @@ public partial class AddWorkerToken : Microsoft.EntityFrameworkCore.Migrations.M
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.AddColumn<int>(
-            name: "WorkerToken",
-            schema: "migration",
-            table: "MigrationLog",
-            type: "int",
-            nullable: true);
-
-        migrationBuilder.CreateIndex(
-            name: "IX_MigrationLog_WorkerToken",
-            schema: "migration",
-            table: "MigrationLog",
-            column: "WorkerToken");
+        // No-op: WorkerToken column and index were added via manual SQL script.
+        // This migration exists to keep EF model snapshot in sync with the database.
     }
 
     /// <inheritdoc />
