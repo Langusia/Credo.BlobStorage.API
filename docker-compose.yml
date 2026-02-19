@@ -9,11 +9,16 @@ services:
     volumes:
       - /2017:/mnt/storage/2017
       - /2018:/mnt/storage/2018
+      - /2019:/mnt/storage/2019
+      - /2020:/mnt/storage/2020
+      - /2021:/mnt/storage/2021
+      - /2022:/mnt/storage/2022
+      - /2023:/mnt/storage/2023
     networks:
       - blobstorage
     restart: unless-stopped
 
-  migrator-0:
+  migrator-2019-w1:
     build:
       context: .
       dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
@@ -25,12 +30,17 @@ services:
       - blobstorage
     environment:
       - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
-      - Migration__WorkerToken=0
-    restart: on-failure
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2019;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2019
+      - Migration__WorkerToken=1
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
     profiles:
       - migration
 
-  migrator-1:
+  migrator-2019-w2:
     build:
       context: .
       dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
@@ -42,8 +52,189 @@ services:
       - blobstorage
     environment:
       - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2019;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2019
+      - Migration__WorkerToken=2
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
+    profiles:
+      - migration
+
+  migrator-2020-w1:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2020;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2020
       - Migration__WorkerToken=1
-    restart: on-failure
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
+    profiles:
+      - migration
+
+  migrator-2020-w2:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2020;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2020
+      - Migration__WorkerToken=2
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
+    profiles:
+      - migration
+
+  migrator-2021-w1:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2021;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2021
+      - Migration__WorkerToken=1
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
+    profiles:
+      - migration
+
+  migrator-2021-w2:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2021;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2021
+      - Migration__WorkerToken=2
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
+    profiles:
+      - migration
+
+  migrator-2022-w1:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2022;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2022
+      - Migration__WorkerToken=1
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
+    profiles:
+      - migration
+
+  migrator-2022-w2:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2022;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2022
+      - Migration__WorkerToken=2
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
+    profiles:
+      - migration
+
+  migrator-2023-w1:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2023;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2023
+      - Migration__WorkerToken=1
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
+    profiles:
+      - migration
+
+  migrator-2023-w2:
+    build:
+      context: .
+      dockerfile: tools/Credo.BlobStorage.Migrator/Dockerfile
+    depends_on:
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - blobstorage
+    environment:
+      - Migration__TargetApiBaseUrl=http://blobstorage-api:8080
+      - Migration__SourceConnectionString=Server=CSSDB02;Database=Documents;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__ContentConnectionString=Server=CSSDB02;Database=Documents_2023;User Id=Documents_User;Password=pass;TrustServerCertificate=True
+      - Migration__Year=2023
+      - Migration__WorkerToken=2
+      - Migration__MaxParallelism=16
+      - Migration__BatchSize=500
+    restart: unless-stopped
     profiles:
       - migration
 
