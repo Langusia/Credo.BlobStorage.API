@@ -25,9 +25,14 @@ namespace Credo.BlobStorage.Client
         };
 
         public BlobStorageClient(HttpClient httpClient, IOptions<BlobStorageClientOptions> options)
+            : this(httpClient, options.Value)
+        {
+        }
+
+        public BlobStorageClient(HttpClient httpClient, BlobStorageClientOptions options)
         {
             _httpClient = httpClient;
-            _options = options.Value;
+            _options = options;
         }
 
         public Task<BlobStorageResult<UploadResponse>> UploadAsync(
@@ -136,12 +141,11 @@ namespace Credo.BlobStorage.Client
 
         private async Task EnsureBucketExistsAsync(string bucket, CancellationToken ct)
         {
-            var json = JsonSerializer.Serialize(new { name = bucket }, JsonOptions);
-            using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
+            using (var request = new HttpRequestMessage(HttpMethod.Put, $"api/buckets/{Uri.EscapeDataString(bucket)}"))
             {
-                using (var response = await _httpClient.PostAsync("api/buckets", content, ct).ConfigureAwait(false))
+                using (var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false))
                 {
-                    // 201 = created, 409 = already exists — both are fine
+                    // 200 = already exists, 201 = created — both are fine
                 }
             }
         }
