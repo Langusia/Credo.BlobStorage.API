@@ -7,6 +7,7 @@ services:
     ports:
       - "5000:8080"
     volumes:
+      - ./logs/api:/app/logs
       - /2017:/mnt/storage/2017
       - /2018:/mnt/storage/2018
       - /2019:/mnt/storage/2019
@@ -25,7 +26,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2019-w1:/app/logs
     networks:
       - blobstorage
     environment:
@@ -47,7 +48,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2019-w2:/app/logs
     networks:
       - blobstorage
     environment:
@@ -69,7 +70,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2020-w1:/app/logs
     networks:
       - blobstorage
     environment:
@@ -91,7 +92,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2020-w2:/app/logs
     networks:
       - blobstorage
     environment:
@@ -113,7 +114,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2021-w1:/app/logs
     networks:
       - blobstorage
     environment:
@@ -135,7 +136,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2021-w2:/app/logs
     networks:
       - blobstorage
     environment:
@@ -157,7 +158,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2022-w1:/app/logs
     networks:
       - blobstorage
     environment:
@@ -179,7 +180,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2022-w2:/app/logs
     networks:
       - blobstorage
     environment:
@@ -201,7 +202,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2023-w1:/app/logs
     networks:
       - blobstorage
     environment:
@@ -223,7 +224,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./logs:/app/logs
+      - ./logs/migrator-2023-w2:/app/logs
     networks:
       - blobstorage
     environment:
