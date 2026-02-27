@@ -114,6 +114,70 @@ public class BucketsController : ControllerBase
     }
 
     /// <summary>
+    /// Ensures a bucket exists. Creates it if missing, returns 200 if it already exists.
+    /// </summary>
+    [HttpPut("{bucket}")]
+    [ProducesResponseType(typeof(BucketResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(BucketResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<BucketResponse>> EnsureBucket(
+        [FromRoute] string bucket,
+        CancellationToken ct)
+    {
+        var validation = BucketNameValidator.Validate(bucket);
+        if (!validation.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Error = new ErrorDetail
+                {
+                    Code = ErrorCodes.InvalidBucketName,
+                    Message = validation.ErrorMessage!,
+                    RequestId = HttpContext.TraceIdentifier
+                }
+            });
+        }
+
+        var entity = await _context.Buckets.FirstOrDefaultAsync(b => b.Name == bucket, ct);
+        if (entity != null)
+        {
+            var objectCount = await _context.Objects.CountAsync(o => o.Bucket == bucket, ct);
+            var totalSize = await _context.Objects
+                .Where(o => o.Bucket == bucket)
+                .SumAsync(o => o.SizeBytes, ct);
+
+            return Ok(new BucketResponse
+            {
+                Name = entity.Name,
+                CreatedAtUtc = entity.CreatedAtUtc,
+                ObjectCount = objectCount,
+                TotalSizeBytes = totalSize
+            });
+        }
+
+        entity = new BucketEntity
+        {
+            Name = bucket,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        _context.Buckets.Add(entity);
+        await _context.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Bucket created via ensure: {Name}", bucket);
+
+        var response = new BucketResponse
+        {
+            Name = entity.Name,
+            CreatedAtUtc = entity.CreatedAtUtc,
+            ObjectCount = 0,
+            TotalSizeBytes = 0
+        };
+
+        return CreatedAtAction(nameof(GetBucket), new { bucket = entity.Name }, response);
+    }
+
+    /// <summary>
     /// Gets information about a specific bucket.
     /// </summary>
     [HttpGet("{bucket}")]
