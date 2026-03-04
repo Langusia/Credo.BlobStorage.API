@@ -14,6 +14,10 @@ public static class FilenameValidator
         @"[\x00-\x1F\x7F]",
         RegexOptions.Compiled);
 
+    private static readonly Regex EncodedControlCharsRegex = new(
+        @"%(?:0[0-9A-Fa-f]|1[0-9A-Fa-f]|7[Ff])",
+        RegexOptions.Compiled);
+
     /// <summary>
     /// Validates a filename according to S3 object key naming rules.
     /// </summary>
@@ -68,8 +72,9 @@ public static class FilenameValidator
 
     /// <summary>
     /// Sanitizes a filename by removing or replacing invalid characters.
-    /// Control characters are replaced with underscores, backslashes with forward slashes,
-    /// leading/trailing slashes are trimmed, and consecutive slashes are collapsed.
+    /// Control characters (and their percent-encoded forms like %00) are replaced with underscores,
+    /// backslashes with forward slashes, leading/trailing slashes are trimmed,
+    /// and consecutive slashes are collapsed.
     /// </summary>
     /// <param name="filename">The filename to sanitize.</param>
     /// <returns>The sanitized filename, or null if the input is null or empty.</returns>
@@ -78,8 +83,11 @@ public static class FilenameValidator
         if (string.IsNullOrEmpty(filename))
             return filename;
 
-        // Replace control chars and backslashes with underscore
-        var sanitized = ControlCharsRegex.Replace(filename, "_");
+        // Replace percent-encoded control chars (%00-%1F, %7F) with underscore
+        var sanitized = EncodedControlCharsRegex.Replace(filename, "_");
+
+        // Replace literal control chars with underscore
+        sanitized = ControlCharsRegex.Replace(sanitized, "_");
         sanitized = sanitized.Replace('\\', '/');
 
         // Remove leading/trailing slashes

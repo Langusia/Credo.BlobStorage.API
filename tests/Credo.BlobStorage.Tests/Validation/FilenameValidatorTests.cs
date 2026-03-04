@@ -149,6 +149,18 @@ public class FilenameValidatorTests
     }
 
     [Theory]
+    [InlineData("50%0001.jpg", "50_1.jpg")]
+    [InlineData("50%0002.jpg", "50_2.jpg")]
+    [InlineData("file%1Fname.txt", "file_name.txt")]
+    [InlineData("file%7fname.txt", "file_name.txt")]
+    public void Sanitize_EncodedControlCharacters_ReplacedWithUnderscore(string input, string expected)
+    {
+        var result = FilenameValidator.Sanitize(input);
+
+        result.Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData("folder\\file.doc", "folder/file.doc")]
     [InlineData("a\\b\\c.txt", "a/b/c.txt")]
     public void Sanitize_Backslashes_ReplacedWithForwardSlash(string input, string expected)
