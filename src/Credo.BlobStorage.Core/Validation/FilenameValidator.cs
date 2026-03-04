@@ -67,6 +67,32 @@ public static class FilenameValidator
     }
 
     /// <summary>
+    /// Sanitizes a filename by removing or replacing invalid characters.
+    /// Control characters are replaced with underscores, backslashes with forward slashes,
+    /// leading/trailing slashes are trimmed, and consecutive slashes are collapsed.
+    /// </summary>
+    /// <param name="filename">The filename to sanitize.</param>
+    /// <returns>The sanitized filename, or null if the input is null or empty.</returns>
+    public static string? Sanitize(string? filename)
+    {
+        if (string.IsNullOrEmpty(filename))
+            return filename;
+
+        // Replace control chars and backslashes with underscore
+        var sanitized = ControlCharsRegex.Replace(filename, "_");
+        sanitized = sanitized.Replace('\\', '/');
+
+        // Remove leading/trailing slashes
+        sanitized = sanitized.Trim('/');
+
+        // Collapse consecutive slashes
+        while (sanitized.Contains("//"))
+            sanitized = sanitized.Replace("//", "/");
+
+        return sanitized;
+    }
+
+    /// <summary>
     /// Normalizes a filename by URL-decoding it.
     /// </summary>
     /// <param name="filename">The potentially URL-encoded filename.</param>

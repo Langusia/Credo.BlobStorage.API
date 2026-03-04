@@ -124,4 +124,79 @@ public class FilenameValidatorTests
 
         result.Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData("report.pdf", "report.pdf")]
+    [InlineData("folder/file.doc", "folder/file.doc")]
+    public void Sanitize_ValidFilename_ReturnsUnchanged(string input, string expected)
+    {
+        var result = FilenameValidator.Sanitize(input);
+
+        result.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("file\tname.txt", "file_name.txt")]
+    [InlineData("file\nname.txt", "file_name.txt")]
+    [InlineData("file\rname.txt", "file_name.txt")]
+    [InlineData("file\x00name.txt", "file_name.txt")]
+    [InlineData("file\x1Fname.txt", "file_name.txt")]
+    public void Sanitize_ControlCharacters_ReplacedWithUnderscore(string input, string expected)
+    {
+        var result = FilenameValidator.Sanitize(input);
+
+        result.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("folder\\file.doc", "folder/file.doc")]
+    [InlineData("a\\b\\c.txt", "a/b/c.txt")]
+    public void Sanitize_Backslashes_ReplacedWithForwardSlash(string input, string expected)
+    {
+        var result = FilenameValidator.Sanitize(input);
+
+        result.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("/file.txt", "file.txt")]
+    [InlineData("file.txt/", "file.txt")]
+    [InlineData("/folder/file.txt/", "folder/file.txt")]
+    public void Sanitize_LeadingTrailingSlashes_Trimmed(string input, string expected)
+    {
+        var result = FilenameValidator.Sanitize(input);
+
+        result.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("folder//file.txt", "folder/file.txt")]
+    [InlineData("a///b//c.txt", "a/b/c.txt")]
+    public void Sanitize_ConsecutiveSlashes_Collapsed(string input, string expected)
+    {
+        var result = FilenameValidator.Sanitize(input);
+
+        result.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Sanitize_NullOrEmpty_ReturnsAsIs(string? input)
+    {
+        var result = FilenameValidator.Sanitize(input);
+
+        result.Should().Be(input);
+    }
+
+    [Fact]
+    public void Sanitize_ResultPassesValidation()
+    {
+        var dirty = "/folder\\sub\tfolder//file\nname.txt/";
+
+        var sanitized = FilenameValidator.Sanitize(dirty);
+
+        sanitized.Should().NotBeNull();
+        FilenameValidator.Validate(sanitized!).IsValid.Should().BeTrue();
+    }
 }
