@@ -19,6 +19,21 @@ services:
       - blobstorage
     restart: unless-stopped
 
+  testapi:
+    build:
+      context: .
+      dockerfile: src/Credo.BlobStorage.TestApi/Dockerfile
+    container_name: blobstorage-testapi
+    ports:
+      - "5001:8080"
+    depends_on:
+      - api
+    networks:
+      - blobstorage
+    environment:
+      - BlobStorage__BaseUrl=http://blobstorage-api:8080
+    restart: unless-stopped
+
   migrator-2019-w1:
     build:
       context: .
