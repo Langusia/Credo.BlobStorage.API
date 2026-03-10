@@ -354,23 +354,11 @@ public class MigrationWorker : BackgroundService
         }
     }
 
-    private string SanitizeFilename(string original, long sourceDocumentId, string? extension)
+    private static string SanitizeFilename(string original, long sourceDocumentId, string? extension)
     {
-        // Try original first
-        if (FilenameValidator.Validate(original).IsValid)
-            return original;
+        var sanitized = FilenameValidator.Sanitize(original);
 
-        // Replace control chars and backslashes with underscore
-        var sanitized = System.Text.RegularExpressions.Regex.Replace(original, @"[\x00-\x1F\x7F\\]", "_");
-
-        // Remove leading/trailing slashes
-        sanitized = sanitized.Trim('/');
-
-        // Replace consecutive slashes
-        while (sanitized.Contains("//"))
-            sanitized = sanitized.Replace("//", "/");
-
-        if (FilenameValidator.Validate(sanitized).IsValid)
+        if (!string.IsNullOrEmpty(sanitized) && FilenameValidator.Validate(sanitized).IsValid)
             return sanitized;
 
         // Fallback to ID-based name
