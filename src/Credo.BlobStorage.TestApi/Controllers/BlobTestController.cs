@@ -1,4 +1,5 @@
 using Credo.BlobStorage.Client;
+using Credo.BlobStorage.Client.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Credo.BlobStorage.TestApi.Controllers;
