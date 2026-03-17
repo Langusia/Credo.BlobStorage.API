@@ -31,6 +31,7 @@ services:
     networks:
       - blobstorage
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
       - BlobStorage__BaseUrl=http://blobstorage-api:8080
     restart: unless-stopped
 
