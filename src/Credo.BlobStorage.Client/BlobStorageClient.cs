@@ -24,6 +24,7 @@ namespace Credo.BlobStorage.Client
             PropertyNameCaseInsensitive = true
         };
 
+        [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
         public BlobStorageClient(HttpClient httpClient, IOptions<BlobStorageClientOptions> options)
             : this(httpClient, options.Value)
         {
