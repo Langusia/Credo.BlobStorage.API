@@ -13,7 +13,29 @@ public class BucketsControllerTests : IClassFixture<TestWebApplicationFactory>, 
 
     public BucketsControllerTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateClient();
+        _factory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                // Remove SqlServer provider and DbContext registrations
+                var dbDescriptors = services
+                    .Where(d => d.ServiceType == typeof(DbContextOptions<BlobStorageDbContext>)
+                             || d.ServiceType == typeof(DbContextOptions)
+                             || (d.ServiceType.FullName?.Contains("SqlServer") ?? false)
+                             || (d.ImplementationType?.FullName?.Contains("SqlServer") ?? false))
+                    .ToList();
+                foreach (var d in dbDescriptors)
+                    services.Remove(d);
+
+                // Add in-memory database for testing
+                services.AddDbContext<BlobStorageDbContext>(options =>
+                {
+                    options.UseInMemoryDatabase("TestDb_" + Guid.NewGuid());
+                });
+            });
+        });
+
+        _client = _factory.CreateClient();
     }
 
     [Fact]
