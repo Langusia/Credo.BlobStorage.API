@@ -42,7 +42,6 @@ public static class ErrorCodes
     public const string BucketNotEmpty = "BucketNotEmpty";
     public const string InvalidBucketName = "InvalidBucketName";
     public const string ObjectNotFound = "ObjectNotFound";
-    public const string ObjectAlreadyExists = "ObjectAlreadyExists";
     public const string InvalidFilename = "InvalidFilename";
     public const string FileTooLarge = "FileTooLarge";
     public const string InvalidContentType = "InvalidContentType";

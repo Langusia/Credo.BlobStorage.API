@@ -110,7 +110,19 @@ public class ObjectsControllerTests : IClassFixture<WebApplicationFactory<Progra
         var objectResponse = await response.Content.ReadFromJsonAsync<ObjectResponse>();
         objectResponse!.DocId.Should().StartWith("2023-");
     }
-    
+
+    [Fact]
+    public async Task Upload_DuplicateFilename_Succeeds()
+    {
+        var content = new ByteArrayContent("content"u8.ToArray());
+        await _client.PutAsync("/api/buckets/test-bucket/objects/duplicate.txt", content);
+
+        var response = await _client.PutAsync("/api/buckets/test-bucket/objects/duplicate.txt", new ByteArrayContent("content2"u8.ToArray()));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var objectResponse = await response.Content.ReadFromJsonAsync<ObjectResponse>();
+        objectResponse!.Filename.Should().Be("duplicate.txt");
+    }
 
     [Fact]
     public async Task Upload_NonExistentBucket_ReturnsNotFound()
