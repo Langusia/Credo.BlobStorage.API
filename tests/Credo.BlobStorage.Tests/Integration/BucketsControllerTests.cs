@@ -1,22 +1,17 @@
 using System.Net;
 using System.Net.Http.Json;
-using Credo.BlobStorage.Api.Data;
 using Credo.BlobStorage.Api.Models.Requests;
 using Credo.BlobStorage.Api.Models.Responses;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Credo.BlobStorage.Tests.Integration;
 
-public class BucketsControllerTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
+public class BucketsControllerTests : IClassFixture<TestWebApplicationFactory>, IDisposable
 {
-    private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
 
-    public BucketsControllerTests(WebApplicationFactory<Program> factory)
+    public BucketsControllerTests(TestWebApplicationFactory factory)
     {
         _factory = factory.WithWebHostBuilder(builder =>
         {
