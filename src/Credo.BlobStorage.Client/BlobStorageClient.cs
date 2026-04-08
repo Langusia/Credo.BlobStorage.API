@@ -130,7 +130,6 @@ namespace Credo.BlobStorage.Client
                     return BlobStorageResult<UploadResponse>.Success((int)response.StatusCode, uploadResponse);
                 }
 
-
                 return await CreateFailureResultAsync<UploadResponse>(response).ConfigureAwait(false);
             }
         }

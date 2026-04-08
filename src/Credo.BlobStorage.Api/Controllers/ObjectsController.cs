@@ -2,7 +2,6 @@ using Credo.BlobStorage.Api.Configuration;
 using Credo.BlobStorage.Api.Data;
 using Credo.BlobStorage.Api.Models.Responses;
 using Credo.BlobStorage.Api.Services;
-using Credo.BlobStorage.Core.Mime;
 using Credo.BlobStorage.Core.Validation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -96,7 +95,7 @@ public class ObjectsController : ControllerBase
                 IsMismatch = o.IsMismatch,
                 IsDangerousMismatch = o.IsDangerousMismatch,
                 CreatedAtUtc = o.CreatedAtUtc,
-                DownloadUrl = $"/api/buckets/{o.Bucket}/objects/{o.DocId}",
+                DownloadUrl = $"/api/buckets/{o.Bucket}/objects/{o.DocId}"
             })
             .ToListAsync(ct);
 
@@ -120,7 +119,6 @@ public class ObjectsController : ControllerBase
     [ProducesResponseType(typeof(ObjectResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ObjectResponse>> Upload(
         [FromRoute] string bucket,
         [FromRoute] string filename,
@@ -130,21 +128,6 @@ public class ObjectsController : ControllerBase
     {
         // URL decode the filename
         filename = FilenameValidator.Normalize(filename);
-
-        // Validate filename
-        var filenameValidation = FilenameValidator.Validate(filename);
-        if (!filenameValidation.IsValid)
-        {
-            return BadRequest(new ErrorResponse
-            {
-                Error = new ErrorDetail
-                {
-                    Code = ErrorCodes.InvalidFilename,
-                    Message = filenameValidation.ErrorMessage!,
-                    RequestId = HttpContext.TraceIdentifier
-                }
-            });
-        }
 
         try
         {
@@ -172,18 +155,6 @@ public class ObjectsController : ControllerBase
                 }
             });
         }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
-        {
-            return Conflict(new ErrorResponse
-            {
-                Error = new ErrorDetail
-                {
-                    Code = ErrorCodes.ObjectAlreadyExists,
-                    Message = ex.Message,
-                    RequestId = HttpContext.TraceIdentifier
-                }
-            });
-        }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new ErrorResponse
@@ -206,7 +177,6 @@ public class ObjectsController : ControllerBase
     [ProducesResponseType(typeof(ObjectResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ObjectResponse>> UploadForm(
         [FromRoute] string bucket,
         [FromQuery] int? year,
@@ -227,21 +197,6 @@ public class ObjectsController : ControllerBase
         }
 
         var filename = file.FileName;
-
-        // Validate filename
-        var filenameValidation = FilenameValidator.Validate(filename);
-        if (!filenameValidation.IsValid)
-        {
-            return BadRequest(new ErrorResponse
-            {
-                Error = new ErrorDetail
-                {
-                    Code = ErrorCodes.InvalidFilename,
-                    Message = filenameValidation.ErrorMessage!,
-                    RequestId = HttpContext.TraceIdentifier
-                }
-            });
-        }
 
         try
         {
@@ -265,18 +220,6 @@ public class ObjectsController : ControllerBase
                 Error = new ErrorDetail
                 {
                     Code = ErrorCodes.BucketNotFound,
-                    Message = ex.Message,
-                    RequestId = HttpContext.TraceIdentifier
-                }
-            });
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
-        {
-            return Conflict(new ErrorResponse
-            {
-                Error = new ErrorDetail
-                {
-                    Code = ErrorCodes.ObjectAlreadyExists,
                     Message = ex.Message,
                     RequestId = HttpContext.TraceIdentifier
                 }

@@ -70,9 +70,6 @@ public class BlobTestController : ControllerBase
         if (result.IsSuccess)
             return Ok(result.Value);
 
-        if (result.StatusCode == 409)
-            return Conflict(new { result.ErrorCode, result.ErrorMessage });
-
         return StatusCode(result.StatusCode, new { result.ErrorCode, result.ErrorMessage });
     }
 }

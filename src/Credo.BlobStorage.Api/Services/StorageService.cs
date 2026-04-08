@@ -58,11 +58,13 @@ public class StorageService : IStorageService
             throw new InvalidOperationException(bucketValidation.ErrorMessage);
         }
 
-        // Step 3: Validate filename
-        var filenameValidation = FilenameValidator.Validate(filename);
-        if (!filenameValidation.IsValid)
+        // Step 3: Validate and sanitize filename
+        if (!FilenameValidator.Validate(filename).IsValid)
         {
-            filename = FilenameValidator.Sanitize(filename);
+            var sanitized = FilenameValidator.Sanitize(filename);
+            filename = !string.IsNullOrEmpty(sanitized) && FilenameValidator.Validate(sanitized).IsValid
+                ? sanitized
+                : "file";
         }
 
         // Step 1: Validate bucket exists
@@ -304,8 +306,6 @@ public class StorageService : IStorageService
 
     private ObjectResponse MapToResponse(ObjectEntity entity)
     {
-        var encodedFilename = Uri.EscapeDataString(entity.Filename);
-
         return new ObjectResponse
         {
             DocId = entity.DocId,
@@ -319,7 +319,7 @@ public class StorageService : IStorageService
             IsMismatch = entity.IsMismatch,
             IsDangerousMismatch = entity.IsDangerousMismatch,
             CreatedAtUtc = entity.CreatedAtUtc,
-            DownloadUrl = $"/api/buckets/{entity.Bucket}/objects/{entity.DocId}",
+            DownloadUrl = $"/api/buckets/{entity.Bucket}/objects/{entity.DocId}"
         };
     }
 }
