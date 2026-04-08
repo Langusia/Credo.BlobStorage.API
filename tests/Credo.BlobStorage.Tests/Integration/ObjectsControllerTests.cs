@@ -110,19 +110,7 @@ public class ObjectsControllerTests : IClassFixture<WebApplicationFactory<Progra
         var objectResponse = await response.Content.ReadFromJsonAsync<ObjectResponse>();
         objectResponse!.DocId.Should().StartWith("2023-");
     }
-
-    [Fact]
-    public async Task Upload_DuplicateFilename_ReturnsConflict()
-    {
-        var content = new ByteArrayContent("content"u8.ToArray());
-        await _client.PutAsync("/api/buckets/test-bucket/objects/duplicate.txt", content);
-
-        var response = await _client.PutAsync("/api/buckets/test-bucket/objects/duplicate.txt", content);
-
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
-        error!.Error.Code.Should().Be(ErrorCodes.ObjectAlreadyExists);
-    }
+    
 
     [Fact]
     public async Task Upload_NonExistentBucket_ReturnsNotFound()
@@ -163,22 +151,6 @@ public class ObjectsControllerTests : IClassFixture<WebApplicationFactory<Progra
 
         // Download
         var response = await _client.GetAsync($"/api/buckets/test-bucket/objects/{objectResponse!.DocId}");
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var downloadedContent = await response.Content.ReadAsByteArrayAsync();
-        downloadedContent.Should().BeEquivalentTo(uploadContent);
-    }
-
-    [Fact]
-    public async Task DownloadByName_ExistingObject_ReturnsFile()
-    {
-        // Upload first
-        var uploadContent = "Download by name test"u8.ToArray();
-        var requestContent = new ByteArrayContent(uploadContent);
-        await _client.PutAsync("/api/buckets/test-bucket/objects/download-by-name.txt", requestContent);
-
-        // Download
-        var response = await _client.GetAsync("/api/buckets/test-bucket/objects/by-name/download-by-name.txt");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var downloadedContent = await response.Content.ReadAsByteArrayAsync();
@@ -228,20 +200,7 @@ public class ObjectsControllerTests : IClassFixture<WebApplicationFactory<Progra
         var getResponse = await _client.GetAsync($"/api/buckets/test-bucket/objects/{objectResponse.DocId}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
-
-    [Fact]
-    public async Task DeleteByName_ExistingObject_ReturnsNoContent()
-    {
-        // Upload first
-        var content = new ByteArrayContent("Delete by name test"u8.ToArray());
-        await _client.PutAsync("/api/buckets/test-bucket/objects/delete-by-name.txt", content);
-
-        // Delete
-        var response = await _client.DeleteAsync("/api/buckets/test-bucket/objects/by-name/delete-by-name.txt");
-
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-    }
-
+    
     [Fact]
     public async Task ListObjects_ReturnsPagedList()
     {

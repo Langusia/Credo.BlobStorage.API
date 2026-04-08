@@ -341,51 +341,6 @@ public class ObjectsController : ControllerBase
     }
 
     /// <summary>
-    /// Downloads a file by filename.
-    /// </summary>
-    [HttpGet("by-name/{*filename}")]
-    [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DownloadByName(
-        [FromRoute] string bucket,
-        [FromRoute] string filename,
-        CancellationToken ct)
-    {
-        filename = FilenameValidator.Normalize(filename);
-
-        try
-        {
-            var (content, metadata) = await _storageService.DownloadByNameAsync(bucket, filename, ct);
-            return CreateFileResult(content, metadata);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse
-            {
-                Error = new ErrorDetail
-                {
-                    Code = ErrorCodes.ObjectNotFound,
-                    Message = ex.Message,
-                    RequestId = HttpContext.TraceIdentifier
-                }
-            });
-        }
-        catch (FileNotFoundException ex)
-        {
-            _logger.LogError(ex, "File not found on disk for filename={Filename}", filename);
-            return NotFound(new ErrorResponse
-            {
-                Error = new ErrorDetail
-                {
-                    Code = ErrorCodes.StorageError,
-                    Message = "File not found on storage.",
-                    RequestId = HttpContext.TraceIdentifier
-                }
-            });
-        }
-    }
-
-    /// <summary>
     /// Gets headers for a file by DocId (HEAD request).
     /// </summary>
     [HttpHead("{docId}")]
@@ -407,32 +362,7 @@ public class ObjectsController : ControllerBase
 
         return Ok();
     }
-
-    /// <summary>
-    /// Gets headers for a file by filename (HEAD request).
-    /// </summary>
-    [HttpHead("by-name/{*filename}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> HeadByName(
-        [FromRoute] string bucket,
-        [FromRoute] string filename,
-        CancellationToken ct)
-    {
-        filename = FilenameValidator.Normalize(filename);
-
-        var metadata = await _storageService.GetMetadataByNameAsync(bucket, filename, ct);
-        if (metadata == null)
-        {
-            return NotFound();
-        }
-
-        SetResponseHeaders(metadata.ServedContentType, metadata.SizeBytes, metadata.Sha256,
-            metadata.Filename, metadata.IsDangerousMismatch);
-
-        return Ok();
-    }
-
+    
     /// <summary>
     /// Deletes a file by DocId.
     /// </summary>
@@ -447,38 +377,6 @@ public class ObjectsController : ControllerBase
         try
         {
             await _storageService.DeleteByIdAsync(bucket, docId, ct);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse
-            {
-                Error = new ErrorDetail
-                {
-                    Code = ErrorCodes.ObjectNotFound,
-                    Message = ex.Message,
-                    RequestId = HttpContext.TraceIdentifier
-                }
-            });
-        }
-    }
-
-    /// <summary>
-    /// Deletes a file by filename.
-    /// </summary>
-    [HttpDelete("by-name/{*filename}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteByName(
-        [FromRoute] string bucket,
-        [FromRoute] string filename,
-        CancellationToken ct)
-    {
-        filename = FilenameValidator.Normalize(filename);
-
-        try
-        {
-            await _storageService.DeleteByNameAsync(bucket, filename, ct);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

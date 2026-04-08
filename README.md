@@ -78,9 +78,7 @@ dotnet test
 | PUT | `/api/buckets/{bucket}/objects/{filename}` | Upload via raw stream |
 | POST | `/api/buckets/{bucket}/objects/form` | Upload via form |
 | GET | `/api/buckets/{bucket}/objects/{docId}` | Download by DocId |
-| GET | `/api/buckets/{bucket}/objects/by-name/{filename}` | Download by filename |
 | DELETE | `/api/buckets/{bucket}/objects/{docId}` | Delete by DocId |
-| DELETE | `/api/buckets/{bucket}/objects/by-name/{filename}` | Delete by filename |
 | HEAD | `/api/buckets/{bucket}/objects/{docId}` | Get headers only |
 
 ## Usage Examples
@@ -114,8 +112,6 @@ curl -X POST http://localhost:5000/api/buckets/invoices/objects/form \
 # By DocId
 curl http://localhost:5000/api/buckets/invoices/objects/2026-3f0d2a7e-8c1b-4a0c-9f0f-2d3a4b5c6d7e -o file.pdf
 
-# By filename
-curl http://localhost:5000/api/buckets/invoices/objects/by-name/report.pdf -o file.pdf
 ```
 
 ### List Objects with Prefix

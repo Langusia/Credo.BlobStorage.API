@@ -62,9 +62,7 @@ public class StorageService : IStorageService
         var filenameValidation = FilenameValidator.Validate(filename);
         if (!filenameValidation.IsValid)
         {
-            _logger.LogWarning("UploadFailed: {Bucket}/{Filename}, Stage=FilenameValidation, Error={Error}",
-                bucket, filename, filenameValidation.ErrorMessage);
-            throw new InvalidOperationException(filenameValidation.ErrorMessage);
+            filename = FilenameValidator.Sanitize(filename);
         }
 
         // Step 1: Validate bucket exists
@@ -74,15 +72,6 @@ public class StorageService : IStorageService
             _logger.LogWarning("UploadFailed: {Bucket}/{Filename}, Stage=BucketNotFound",
                 bucket, filename);
             throw new KeyNotFoundException($"Bucket '{bucket}' not found.");
-        }
-
-        // Step 4: Check filename uniqueness
-        var filenameExists = await _context.Objects
-            .AnyAsync(o => o.Bucket == bucket && o.Filename == filename, ct);
-        if (filenameExists)
-        {
-            _logger.LogWarning("UploadConflict: {Bucket}/{Filename}", bucket, filename);
-            throw new InvalidOperationException($"Object '{filename}' already exists in bucket '{bucket}'.");
         }
 
         // Step 5-6: Generate DocId

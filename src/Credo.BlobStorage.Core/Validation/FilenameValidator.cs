@@ -78,7 +78,7 @@ public static class FilenameValidator
     /// </summary>
     /// <param name="filename">The filename to sanitize.</param>
     /// <returns>The sanitized filename, or null if the input is null or empty.</returns>
-    public static string? Sanitize(string? filename)
+    public static string Sanitize(string filename)
     {
         if (string.IsNullOrEmpty(filename))
             return filename;

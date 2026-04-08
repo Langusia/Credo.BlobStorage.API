@@ -118,11 +118,6 @@ public class BlobStorageDbContext : DbContext
             entity.HasIndex(e => e.Bucket)
                 .HasDatabaseName("IX_Objects_Bucket");
 
-            // Unique constraint on Bucket + Filename combination
-            entity.HasIndex(e => new { e.Bucket, e.Filename })
-                .IsUnique()
-                .HasDatabaseName("UQ_Objects_Bucket_Filename");
-
             // Foreign key relationship to Buckets
             entity.HasOne(e => e.BucketNavigation)
                 .WithMany(b => b.Objects)

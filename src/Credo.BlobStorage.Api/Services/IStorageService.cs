@@ -59,14 +59,6 @@ public interface IStorageService
     Task DeleteByIdAsync(string bucket, string docId, CancellationToken ct = default);
 
     /// <summary>
-    /// Deletes a file by filename.
-    /// </summary>
-    /// <param name="bucket">Bucket name.</param>
-    /// <param name="filename">Filename.</param>
-    /// <param name="ct">Cancellation token.</param>
-    Task DeleteByNameAsync(string bucket, string filename, CancellationToken ct = default);
-
-    /// <summary>
     /// Gets object metadata by DocId.
     /// </summary>
     /// <param name="bucket">Bucket name.</param>
@@ -74,13 +66,4 @@ public interface IStorageService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Object metadata or null if not found.</returns>
     Task<ObjectEntity?> GetMetadataByIdAsync(string bucket, string docId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Gets object metadata by filename.
-    /// </summary>
-    /// <param name="bucket">Bucket name.</param>
-    /// <param name="filename">Filename.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Object metadata or null if not found.</returns>
-    Task<ObjectEntity?> GetMetadataByNameAsync(string bucket, string filename, CancellationToken ct = default);
 }

@@ -4,16 +4,19 @@ using Credo.BlobStorage.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace Credo.BlobStorage.Api.Data.Migrations
+namespace Credo.BlobStorage.Api.Migrations
 {
     [DbContext(typeof(BlobStorageDbContext))]
-    partial class BlobStorageDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260408093120_RemoveIndex")]
+    partial class RemoveIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
