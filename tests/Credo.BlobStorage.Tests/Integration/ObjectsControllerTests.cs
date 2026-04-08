@@ -1,59 +1,20 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using Credo.BlobStorage.Api.Configuration;
-using Credo.BlobStorage.Api.Data;
 using Credo.BlobStorage.Api.Models.Requests;
 using Credo.BlobStorage.Api.Models.Responses;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Credo.BlobStorage.Tests.Integration;
 
-public class ObjectsControllerTests : IClassFixture<WebApplicationFactory<Program>>, IAsyncLifetime
+public class ObjectsControllerTests : IClassFixture<TestWebApplicationFactory>, IAsyncLifetime
 {
-    private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private readonly string _testStoragePath;
 
-    public ObjectsControllerTests(WebApplicationFactory<Program> factory)
+    public ObjectsControllerTests(TestWebApplicationFactory factory)
     {
-        _testStoragePath = Path.Combine(Path.GetTempPath(), "blob-storage-tests-" + Guid.NewGuid());
-        Directory.CreateDirectory(_testStoragePath);
-
-        _factory = factory.WithWebHostBuilder(builder =>
-        {
-            builder.ConfigureServices(services =>
-            {
-                // Remove all EF/DbContext registrations so InMemory replaces SqlServer cleanly
-                var dbDescriptors = services
-                    .Where(d => d.ServiceType == typeof(DbContextOptions<BlobStorageDbContext>)
-                             || d.ServiceType == typeof(DbContextOptions)
-                             || d.ServiceType == typeof(BlobStorageDbContext)
-                             || (d.ServiceType.Namespace?.Contains("EntityFrameworkCore") ?? false))
-                    .ToList();
-                foreach (var d in dbDescriptors)
-                    services.Remove(d);
-
-                // Add in-memory database for testing
-                services.AddDbContext<BlobStorageDbContext>(options =>
-                {
-                    options.UseInMemoryDatabase("TestDb_" + Guid.NewGuid());
-                });
-
-                // Configure test storage path
-                services.Configure<StorageOptions>(opt =>
-                {
-                    opt.RootPath = _testStoragePath;
-                });
-            });
-        });
-
-        _client = _factory.CreateClient();
+        _client = factory.CreateClient();
     }
 
     public async Task InitializeAsync()
@@ -65,20 +26,6 @@ public class ObjectsControllerTests : IClassFixture<WebApplicationFactory<Progra
     public Task DisposeAsync()
     {
         _client.Dispose();
-
-        // Clean up test storage
-        try
-        {
-            if (Directory.Exists(_testStoragePath))
-            {
-                Directory.Delete(_testStoragePath, recursive: true);
-            }
-        }
-        catch
-        {
-            // Ignore cleanup errors
-        }
-
         return Task.CompletedTask;
     }
 
@@ -214,7 +161,7 @@ public class ObjectsControllerTests : IClassFixture<WebApplicationFactory<Progra
         var getResponse = await _client.GetAsync($"/api/buckets/test-bucket/objects/{objectResponse.DocId}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
-    
+
     [Fact]
     public async Task ListObjects_ReturnsPagedList()
     {
