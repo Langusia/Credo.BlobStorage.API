@@ -29,12 +29,12 @@ public class ObjectsControllerTests : IClassFixture<WebApplicationFactory<Progra
         {
             builder.ConfigureServices(services =>
             {
-                // Remove all EF/DbContext registrations so InMemory replaces SqlServer cleanly
+                // Remove SqlServer provider and DbContext registrations
                 var dbDescriptors = services
                     .Where(d => d.ServiceType == typeof(DbContextOptions<BlobStorageDbContext>)
                              || d.ServiceType == typeof(DbContextOptions)
-                             || d.ServiceType == typeof(BlobStorageDbContext)
-                             || (d.ServiceType.Namespace?.Contains("EntityFrameworkCore") ?? false))
+                             || (d.ServiceType.FullName?.Contains("SqlServer") ?? false)
+                             || (d.ImplementationType?.FullName?.Contains("SqlServer") ?? false))
                     .ToList();
                 foreach (var d in dbDescriptors)
                     services.Remove(d);
