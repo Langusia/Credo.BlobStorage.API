@@ -14,38 +14,7 @@ public class ObjectsControllerTests : IClassFixture<TestWebApplicationFactory>, 
 
     public ObjectsControllerTests(TestWebApplicationFactory factory)
     {
-        _testStoragePath = Path.Combine(Path.GetTempPath(), "blob-storage-tests-" + Guid.NewGuid());
-        Directory.CreateDirectory(_testStoragePath);
-
-        _factory = factory.WithWebHostBuilder(builder =>
-        {
-            builder.ConfigureServices(services =>
-            {
-                // Remove SqlServer provider and DbContext registrations
-                var dbDescriptors = services
-                    .Where(d => d.ServiceType == typeof(DbContextOptions<BlobStorageDbContext>)
-                             || d.ServiceType == typeof(DbContextOptions)
-                             || (d.ServiceType.FullName?.Contains("SqlServer") ?? false)
-                             || (d.ImplementationType?.FullName?.Contains("SqlServer") ?? false))
-                    .ToList();
-                foreach (var d in dbDescriptors)
-                    services.Remove(d);
-
-                // Add in-memory database for testing
-                services.AddDbContext<BlobStorageDbContext>(options =>
-                {
-                    options.UseInMemoryDatabase("TestDb_" + Guid.NewGuid());
-                });
-
-                // Configure test storage path
-                services.Configure<StorageOptions>(opt =>
-                {
-                    opt.RootPath = _testStoragePath;
-                });
-            });
-        });
-
-        _client = _factory.CreateClient();
+        _client = factory.CreateClient();
     }
 
     public async Task InitializeAsync()
