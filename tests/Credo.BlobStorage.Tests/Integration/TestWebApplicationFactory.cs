@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -25,8 +26,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
-            services.RemoveAll<DbContextOptions<BlobStorageDbContext>>();
-
+            services.RemoveAll<IDbContextOptionsConfiguration<BlobStorageDbContext>>();
+            
             services.AddDbContext<BlobStorageDbContext>(options =>
             {
                 options.UseInMemoryDatabase("TestDb_" + Guid.NewGuid());
