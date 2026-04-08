@@ -39,18 +39,6 @@ public interface IStorageService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Downloads a file by filename.
-    /// </summary>
-    /// <param name="bucket">Bucket name.</param>
-    /// <param name="filename">Filename.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Tuple of file stream and metadata.</returns>
-    Task<(Stream Content, ObjectEntity Metadata)> DownloadByNameAsync(
-        string bucket,
-        string filename,
-        CancellationToken ct = default);
-
-    /// <summary>
     /// Deletes a file by DocId.
     /// </summary>
     /// <param name="bucket">Bucket name.</param>

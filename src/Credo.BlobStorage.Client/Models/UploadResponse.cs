@@ -16,6 +16,5 @@ namespace Credo.BlobStorage.Client.Models
         public bool IsDangerousMismatch { get; set; }
         public DateTime CreatedAtUtc { get; set; }
         public string DownloadUrl { get; set; } = string.Empty;
-        public string DownloadByNameUrl { get; set; } = string.Empty;
     }
 }

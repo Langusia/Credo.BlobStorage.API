@@ -64,9 +64,4 @@ public record ObjectResponse
     /// URL to download the file by DocId.
     /// </summary>
     public required string DownloadUrl { get; init; }
-
-    /// <summary>
-    /// URL to download the file by filename.
-    /// </summary>
-    public required string DownloadByNameUrl { get; init; }
 }

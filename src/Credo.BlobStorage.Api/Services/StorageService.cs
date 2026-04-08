@@ -248,43 +248,6 @@ public class StorageService : IStorageService
     }
 
     /// <inheritdoc />
-    public async Task<(Stream Content, ObjectEntity Metadata)> DownloadByNameAsync(
-        string bucket,
-        string filename,
-        CancellationToken ct = default)
-    {
-        _logger.LogInformation("DownloadStarted: {Bucket}/by-name/{Filename}", bucket, filename);
-        var startTime = DateTime.UtcNow;
-
-        var entity = await _context.Objects
-            .FirstOrDefaultAsync(o => o.Bucket == bucket && o.Filename == filename, ct);
-
-        if (entity == null)
-        {
-            _logger.LogWarning("DownloadNotFound: {Bucket}/by-name/{Filename}", bucket, filename);
-            throw new KeyNotFoundException($"Object '{filename}' not found in bucket '{bucket}'.");
-        }
-
-        var extension = entity.DetectedExtension ?? MimeTypes.DefaultExtension;
-        var filePath = _pathBuilder.BuildBlobPath(entity.DocId, extension);
-
-        if (!File.Exists(filePath))
-        {
-            _logger.LogError("DownloadFailed: {Bucket}/by-name/{Filename}, File not found on disk at {Path}",
-                bucket, filename, filePath);
-            throw new FileNotFoundException($"File not found on disk for '{filename}'.", filePath);
-        }
-
-        var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, _options.UploadBufferSize, useAsync: true);
-
-        var durationMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
-        _logger.LogInformation("DownloadCompleted: {Bucket}/by-name/{Filename}, DocId={DocId}, SizeBytes={SizeBytes}, DurationMs={DurationMs}",
-            bucket, filename, entity.DocId, entity.SizeBytes, durationMs);
-
-        return (stream, entity);
-    }
-
-    /// <inheritdoc />
     public async Task DeleteByIdAsync(string bucket, string docId, CancellationToken ct = default)
     {
         var entity = await _context.Objects
@@ -299,23 +262,6 @@ public class StorageService : IStorageService
         await DeleteEntityAsync(entity, ct);
 
         _logger.LogInformation("DeleteCompleted: {Bucket}/{DocId}, Filename={Filename}", bucket, docId, entity.Filename);
-    }
-
-    /// <inheritdoc />
-    public async Task DeleteByNameAsync(string bucket, string filename, CancellationToken ct = default)
-    {
-        var entity = await _context.Objects
-            .FirstOrDefaultAsync(o => o.Bucket == bucket && o.Filename == filename, ct);
-
-        if (entity == null)
-        {
-            _logger.LogWarning("DeleteNotFound: {Bucket}/by-name/{Filename}", bucket, filename);
-            throw new KeyNotFoundException($"Object '{filename}' not found in bucket '{bucket}'.");
-        }
-
-        await DeleteEntityAsync(entity, ct);
-
-        _logger.LogInformation("DeleteCompleted: {Bucket}/{DocId}, Filename={Filename}", bucket, entity.DocId, filename);
     }
 
     private async Task DeleteEntityAsync(ObjectEntity entity, CancellationToken ct)
@@ -356,13 +302,6 @@ public class StorageService : IStorageService
             .FirstOrDefaultAsync(o => o.Bucket == bucket && o.DocId == docId, ct);
     }
 
-    /// <inheritdoc />
-    public async Task<ObjectEntity?> GetMetadataByNameAsync(string bucket, string filename, CancellationToken ct = default)
-    {
-        return await _context.Objects
-            .FirstOrDefaultAsync(o => o.Bucket == bucket && o.Filename == filename, ct);
-    }
-
     private ObjectResponse MapToResponse(ObjectEntity entity)
     {
         var encodedFilename = Uri.EscapeDataString(entity.Filename);
@@ -381,7 +320,6 @@ public class StorageService : IStorageService
             IsDangerousMismatch = entity.IsDangerousMismatch,
             CreatedAtUtc = entity.CreatedAtUtc,
             DownloadUrl = $"/api/buckets/{entity.Bucket}/objects/{entity.DocId}",
-            DownloadByNameUrl = $"/api/buckets/{entity.Bucket}/objects/by-name/{encodedFilename}"
         };
     }
 }

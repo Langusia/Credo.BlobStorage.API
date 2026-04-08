@@ -97,7 +97,6 @@ public class ObjectsController : ControllerBase
                 IsDangerousMismatch = o.IsDangerousMismatch,
                 CreatedAtUtc = o.CreatedAtUtc,
                 DownloadUrl = $"/api/buckets/{o.Bucket}/objects/{o.DocId}",
-                DownloadByNameUrl = $"/api/buckets/{o.Bucket}/objects/by-name/{Uri.EscapeDataString(o.Filename)}"
             })
             .ToListAsync(ct);
 

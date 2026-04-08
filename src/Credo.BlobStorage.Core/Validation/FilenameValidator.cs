@@ -81,7 +81,7 @@ public static class FilenameValidator
     public static string Sanitize(string filename)
     {
         if (string.IsNullOrEmpty(filename))
-            return filename;
+            return "file";
 
         // Replace percent-encoded control chars (%00-%1F, %7F) with underscore
         var sanitized = EncodedControlCharsRegex.Replace(filename, "_");

@@ -130,11 +130,6 @@ namespace Credo.BlobStorage.Client
                     return BlobStorageResult<UploadResponse>.Success((int)response.StatusCode, uploadResponse);
                 }
 
-                if (response.StatusCode == HttpStatusCode.Conflict)
-                {
-                    // 409 = object already exists — treat as success
-                    return BlobStorageResult<UploadResponse>.Success((int)response.StatusCode, null!);
-                }
 
                 return await CreateFailureResultAsync<UploadResponse>(response).ConfigureAwait(false);
             }
