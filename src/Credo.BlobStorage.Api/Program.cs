@@ -74,7 +74,10 @@ using (var scope = app.Services.CreateScope())
     try
     {
         // Apply migrations (skip for InMemory provider used in tests)
-        if (dbContext.Database.IsRelational())
+        var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<BlobStorageDbContext>>();
+        var isInMemory = dbOptions.Extensions.Any(e => e.GetType().Name.Contains("InMemory"));
+
+        if (!isInMemory)
         {
             logger.LogInformation("Applying database migrations for schema '{Schema}'...", BlobStorageDbContext.SchemaName);
             dbContext.Database.Migrate();
