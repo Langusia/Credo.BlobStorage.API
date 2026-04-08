@@ -139,7 +139,7 @@ public class ObjectsController : ControllerBase
                 year,
                 ct);
 
-            Response.Headers.ETag = response.Sha256;
+            Response.Headers.ETag = $"\"{response.Sha256}\"";
 
             return CreatedAtAction(nameof(DownloadById), new { bucket, docId = response.DocId }, response);
         }
@@ -209,7 +209,7 @@ public class ObjectsController : ControllerBase
                 year,
                 ct);
 
-            Response.Headers.ETag = response.Sha256;
+            Response.Headers.ETag = $"\"{response.Sha256}\"";
 
             return CreatedAtAction(nameof(DownloadById), new { bucket, docId = response.DocId }, response);
         }
@@ -348,7 +348,7 @@ public class ObjectsController : ControllerBase
     {
         Response.Headers.ContentType = contentType;
         Response.Headers.ContentLength = sizeBytes;
-        Response.Headers.ETag = Convert.ToHexString(sha256);
+        Response.Headers.ETag = $"\"{Convert.ToHexString(sha256)}\"";
 
         // Determine content disposition
         ContentDispositionHeaderValue disposition;
