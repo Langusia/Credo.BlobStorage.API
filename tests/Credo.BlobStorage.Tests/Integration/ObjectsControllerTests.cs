@@ -29,13 +29,13 @@ public class ObjectsControllerTests : IClassFixture<WebApplicationFactory<Progra
         {
             builder.ConfigureServices(services =>
             {
-                // Remove the existing DbContext registration
-                var descriptor = services.SingleOrDefault(
-                    d => d.ServiceType == typeof(DbContextOptions<BlobStorageDbContext>));
-                if (descriptor != null)
-                {
-                    services.Remove(descriptor);
-                }
+                // Remove all DbContext registrations so InMemory replaces SqlServer cleanly
+                var dbDescriptors = services
+                    .Where(d => d.ServiceType == typeof(DbContextOptions<BlobStorageDbContext>)
+                             || d.ServiceType == typeof(DbContextOptions))
+                    .ToList();
+                foreach (var d in dbDescriptors)
+                    services.Remove(d);
 
                 // Add in-memory database for testing
                 services.AddDbContext<BlobStorageDbContext>(options =>

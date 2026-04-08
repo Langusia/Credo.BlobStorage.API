@@ -73,10 +73,17 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
-        // Apply migrations
-        logger.LogInformation("Applying database migrations for schema '{Schema}'...", BlobStorageDbContext.SchemaName);
-        dbContext.Database.Migrate();
-        logger.LogInformation("Database migrations applied successfully");
+        // Apply migrations (skip for InMemory provider used in tests)
+        if (dbContext.Database.IsRelational())
+        {
+            logger.LogInformation("Applying database migrations for schema '{Schema}'...", BlobStorageDbContext.SchemaName);
+            dbContext.Database.Migrate();
+            logger.LogInformation("Database migrations applied successfully");
+        }
+        else
+        {
+            dbContext.Database.EnsureCreated();
+        }
 
         // Seed default buckets
         if (storageOptions.DefaultBuckets.Length > 0)
