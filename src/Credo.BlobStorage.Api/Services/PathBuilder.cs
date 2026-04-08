@@ -20,7 +20,7 @@ public class PathBuilder : IPathBuilder
     {
         var directoryPath = BuildDirectoryPath(docId);
         var sanitizedExtension = extension.TrimStart('.');
-        return Path.Combine(directoryPath, $"blob.{sanitizedExtension}");
+        return $"{directoryPath}/blob.{sanitizedExtension}";
     }
 
     /// <inheritdoc />
@@ -35,14 +35,14 @@ public class PathBuilder : IPathBuilder
         var lvl1 = guidNoHyphens[..2].ToLowerInvariant();
         var lvl2 = guidNoHyphens[2..4].ToLowerInvariant();
 
-        return Path.Combine(_options.RootPath, year.ToString(), lvl1, lvl2, docId);
+        return $"{_options.RootPath}/{year}/{lvl1}/{lvl2}/{docId}";
     }
 
     /// <inheritdoc />
     public string BuildTempPath(string docId)
     {
         var directoryPath = BuildDirectoryPath(docId);
-        return Path.Combine(directoryPath, "blob.tmp");
+        return $"{directoryPath}/blob.tmp";
     }
 
     /// <inheritdoc />
