@@ -27,10 +27,11 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IDbContextOptionsConfiguration<BlobStorageDbContext>>();
-            
+
+            var dbName = "TestDb_" + Guid.NewGuid();
             services.AddDbContext<BlobStorageDbContext>(options =>
             {
-                options.UseInMemoryDatabase("TestDb_" + Guid.NewGuid());
+                options.UseInMemoryDatabase(dbName);
             });
 
             services.Configure<StorageOptions>(opt =>
