@@ -149,8 +149,8 @@ public class FilenameValidatorTests
     }
 
     [Theory]
-    [InlineData("50%0001.jpg", "50_1.jpg")]
-    [InlineData("50%0002.jpg", "50_2.jpg")]
+    [InlineData("50%0001.jpg", "50_01.jpg")]
+    [InlineData("50%0002.jpg", "50_02.jpg")]
     [InlineData("file%1Fname.txt", "file_name.txt")]
     [InlineData("file%7fname.txt", "file_name.txt")]
     public void Sanitize_EncodedControlCharacters_ReplacedWithUnderscore(string input, string expected)

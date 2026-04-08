@@ -2,8 +2,10 @@ using Credo.BlobStorage.Api.Configuration;
 using Credo.BlobStorage.Api.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Credo.BlobStorage.Tests.Integration;
 
@@ -21,25 +23,15 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
 
-        builder.ConfigureServices(services =>
+        builder.ConfigureTestServices(services =>
         {
-            // Remove everything related to the real database
-            var descriptorsToRemove = services
-                .Where(d => d.ServiceType == typeof(DbContextOptions<BlobStorageDbContext>)
-                         || d.ServiceType == typeof(DbContextOptions)
-                         || (d.ServiceType.FullName?.Contains("SqlServer") ?? false)
-                         || (d.ImplementationType?.FullName?.Contains("SqlServer") ?? false))
-                .ToList();
-            foreach (var d in descriptorsToRemove)
-                services.Remove(d);
+            services.RemoveAll<DbContextOptions<BlobStorageDbContext>>();
 
-            // Register InMemory database
             services.AddDbContext<BlobStorageDbContext>(options =>
             {
                 options.UseInMemoryDatabase("TestDb_" + Guid.NewGuid());
             });
 
-            // Point storage at temp directory
             services.Configure<StorageOptions>(opt =>
             {
                 opt.RootPath = _testStoragePath;
