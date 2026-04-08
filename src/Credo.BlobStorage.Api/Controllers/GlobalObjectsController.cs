@@ -126,7 +126,7 @@ public class GlobalObjectsController : ControllerBase
     {
         Response.Headers.ContentType = metadata.ServedContentType;
         Response.Headers.ContentLength = metadata.SizeBytes;
-        Response.Headers.ETag = Convert.ToHexString(metadata.Sha256);
+        Response.Headers.ETag = $"\"{Convert.ToHexString(metadata.Sha256)}\"";
 
         ContentDispositionHeaderValue disposition;
 
